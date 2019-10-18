@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project-private xmlns="http://www.netbeans.org/ns/project-private/1">
+    <code-assistance-data xmlns="http://www.netbeans.org/ns/make-project-private/1">
+        <code-model-enabled>true</code-model-enabled>
+    </code-assistance-data>
+    <data xmlns="http://www.netbeans.org/ns/make-project-private/1">
+        <activeConfTypeElem>0</activeConfTypeElem>
+        <activeConfIndexElem>0</activeConfIndexElem>
+    </data>
+    <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
+    <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
+        <group>
+            <file>file:/home/wonki/rocksdb/options/cf_options.h</file>
+            <file>file:/home/wonki/rocksdb/db/policy_rl/PrioritizedExperienceReplay.h</file>
+            <file>file:/home/wonki/rocksdb/db/policy_rl/PrioritizedExperienceReplay.cc</file>
+            <file>file:/home/wonki/rocksdb/db/db_impl/db_impl.cc</file>
+            <file>file:/home/wonki/rocksdb/db/policy_rl/ExperienceReplay.h</file>
+            <file>file:/home/wonki/rocksdb/db/policy_rl/Trainer.cc</file>
+            <file>file:/home/wonki/rocksdb/db/compaction/compaction_picker_level.cc</file>
+            <file>file:/home/wonki/rocksdb/db/compaction/compaction_picker.cc</file>
+            <file>file:/home/wonki/rocksdb/db/db_impl/db_impl.h</file>
+            <file>file:/home/wonki/rocksdb/db/db_impl/db_impl_open.cc</file>
+            <file>file:/home/wonki/rocksdb/db/c.cc</file>
+            <file>file:/home/wonki/rocksdb/db/compaction/compaction.cc</file>
+            <file>file:/home/wonki/rocksdb/libtorch/include/ATen/core/TensorAccessor.h</file>
+            <file>file:/home/wonki/rocksdb/db/column_family.cc</file>
+            <file>file:/home/wonki/rocksdb/db/policy_rl/dqn.h</file>
+            <file>file:/home/wonki/rocksdb/db/policy_rl/dqn.cc</file>
+            <file>file:/home/wonki/rocksdb/db/compaction/compaction_picker_level.h</file>
+            <file>file:/home/wonki/rocksdb/db/version_edit.h</file>
+            <file>file:/home/wonki/rocksdb/db/column_family.h</file>
+            <file>file:/home/wonki/rocksdb/db/db_impl/db_impl_compaction_flush.cc</file>
+            <file>file:/home/wonki/rocksdb/db/policy_rl/ExperienceReplay.cc</file>
+            <file>file:/home/wonki/rocksdb/db/compaction/compaction_picker_test.cc</file>
+            <file>file:/home/wonki/rocksdb/db/version_set.cc</file>
+            <file>file:/home/wonki/rocksdb/db/version_set.h</file>
+            <file>file:/home/wonki/rocksdb/include/rocksdb/advanced_options.h</file>
+            <file>file:/home/wonki/rocksdb/db/compaction/compaction_job.cc</file>
+            <file>file:/home/wonki/rocksdb/db/policy_rl/noisy.h</file>
+            <file>file:/home/wonki/rocksdb/db/policy_rl/Trainer.h</file>
+            <file>file:/home/wonki/rocksdb/db/dbformat.h</file>
+        </group>
+    </open-files>
+    <preferences xmlns="http://www.netbeans.org/ns/auxiliary-configuration-preferences/1">
+        <module name="org-netbeans-modules-cnd-discovery">
+            <property name="rootFolder" value="/home/wonki/rocksdb"/>
+        </module>
+    </preferences>
+</project-private>
