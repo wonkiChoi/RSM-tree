@@ -1959,7 +1959,7 @@ class DBImpl : public DB {
   bool wal_in_db_path_;
   Trainer rocksdb_trainer;
   std::vector<float> all_rewards;
-  std::vector<torch::Tensor> losses;
+  //std::vector<torch::Tensor> losses;
 };
 
 extern Options SanitizeOptions(const std::string& db, const Options& src);

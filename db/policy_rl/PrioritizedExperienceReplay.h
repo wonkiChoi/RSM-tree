@@ -18,10 +18,10 @@
 struct element{
     float_t td_error;
     int64_t index;
-    std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> transition;
+    std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> transition;
 
     element(float_t error, int64_t ind,
-            std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> trans):
+            std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> trans):
             td_error(error),
             index(ind),
             transition(trans)
@@ -45,9 +45,9 @@ public: std::priority_queue<element> buffer;
 public:
     PrioritizedExperienceReplay (int64_t capacity);
     void push(torch::Tensor state,torch::Tensor new_state,torch::
-    Tensor action,torch::Tensor done,torch::Tensor reward, float_t td_error, int64_t index);
+    Tensor action, torch::Tensor reward, float_t td_error, int64_t index);
     int64_t size_buffer();
-    std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>> sample_queue(int64_t batch_size);
+    std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>> sample_queue(int64_t batch_size);
 
 
 };

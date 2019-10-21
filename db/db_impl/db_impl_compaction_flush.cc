@@ -2744,7 +2744,7 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
         immutable_db_options_.max_subcompactions <= 1 &&
                 c->mutable_cf_options()->snap_refresh_nanos > 0
             ? &fetch_callback
-            : nullptr, rocksdb_trainer);
+            : nullptr, &rocksdb_trainer);
     compaction_job.Prepare();
 
     NotifyOnCompactionBegin(c->column_family_data(), c.get(), status,
@@ -2757,7 +2757,7 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
     TEST_SYNC_POINT("DBImpl::BackgroundCompaction:NonTrivial:AfterRun");
     mutex_.Lock();
 
-    status = compaction_job.Install(*c->mutable_cf_options(), all_rewards, losses;);
+    status = compaction_job.Install(*c->mutable_cf_options(), all_rewards);
     if (status.ok()) {
       InstallSuperVersionAndScheduleWork(c->column_family_data(),
                                          &job_context->superversion_contexts[0],

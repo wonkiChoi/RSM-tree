@@ -22,9 +22,9 @@ ExperienceReplay::ExperienceReplay(int64_t size) {
 }
 
 void ExperienceReplay::push(torch::Tensor state,torch::Tensor new_state,torch::
-    Tensor action,torch::Tensor done,torch::Tensor reward){
+    Tensor action, torch::Tensor reward){
 
-    std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> sample (state, new_state, action, reward, done);
+    std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> sample (state, new_state, action, reward);
         if (buffer.size() < capacity){
             buffer.push_back(sample);
         }
@@ -36,9 +36,9 @@ void ExperienceReplay::push(torch::Tensor state,torch::Tensor new_state,torch::
         }
     }
 
-    std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>> ExperienceReplay::sample_queue(
+    std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>> ExperienceReplay::sample_queue(
             int64_t batch_size){
-        std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>> b(batch_size);
+        std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>> b(batch_size);
         
         std::random_device rd;
         std::mt19937 random(rd());

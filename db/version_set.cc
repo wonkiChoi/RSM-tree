@@ -51,6 +51,7 @@
 #include "util/stop_watch.h"
 #include "util/string_util.h"
 #include "util/user_comparator_wrapper.h"
+#include "db/policy_rl/Trainer.h"
 
 namespace rocksdb {
 
@@ -2038,6 +2039,19 @@ void Version::PrepareApply(
   storage_info_.GenerateBottommostFiles();
 }
 
+void Version::PrepareApply(
+    const MutableCFOptions& mutable_cf_options,
+    bool update_stats, Trainer * rocksdb_trainer_) {
+  UpdateAccumulatedStats(update_stats);
+  storage_info_.UpdateNumNonEmptyLevels();
+  storage_info_.CalculateBaseBytes(*cfd_->ioptions(), mutable_cf_options);
+  storage_info_.UpdateFilesByCompactionPri(cfd_->ioptions()->compaction_pri, rocksdb_trainer_);
+  storage_info_.GenerateFileIndexer();
+  storage_info_.GenerateLevelFilesBrief();
+  storage_info_.GenerateLevel0NonOverlapping();
+  storage_info_.GenerateBottommostFiles();
+}
+
 bool Version::MaybeInitializeFileMetaData(FileMetaData* file_meta) {
   if (file_meta->init_stats_from_file ||
       file_meta->compensated_file_size > 0) {
@@ -2655,6 +2669,7 @@ void VersionStorageInfo::UpdateFilesByCompactionPri(
     // don't need this
     return;
   }
+  
   // No need to sort the highest level because it is never compacted.
   for (int level = 0; level < num_levels() - 1; level++) {
     const std::vector<FileMetaData*>& files = files_[level];
@@ -2673,6 +2688,104 @@ void VersionStorageInfo::UpdateFilesByCompactionPri(
     if (num > temp.size()) {
       num = temp.size();
     }
+    switch (compaction_pri) {
+      case kByCompensatedSize:
+        std::partial_sort(temp.begin(), temp.begin() + num, temp.end(),
+                          CompareCompensatedSizeDescending);
+        break;
+      case kOldestLargestSeqFirst:
+        std::sort(temp.begin(), temp.end(),
+                  [](const Fsize& f1, const Fsize& f2) -> bool {
+                    return f1.file->fd.largest_seqno <
+                           f2.file->fd.largest_seqno;
+                  });
+        break;
+      case kOldestSmallestSeqFirst:
+        std::sort(temp.begin(), temp.end(),
+                  [](const Fsize& f1, const Fsize& f2) -> bool {
+                    return f1.file->fd.smallest_seqno <
+                           f2.file->fd.smallest_seqno;
+                  });
+        break;
+      case kMinOverlappingRatio:
+        SortFileByOverlappingRatio(*internal_comparator_, files_[level],
+                                   files_[level + 1], &temp);
+        break;
+      default:
+        assert(false);
+    }
+    assert(temp.size() == files.size());
+
+    // initialize files_by_compaction_pri_
+    for (size_t i = 0; i < temp.size(); i++) {
+      files_by_compaction_pri.push_back(static_cast<int>(temp[i].index));
+    }
+    next_file_to_compact_by_size_[level] = 0;
+    assert(files_[level].size() == files_by_compaction_pri_[level].size());
+  }
+}
+
+CompactionPri retCompactionPri(uint64_t index) {
+    switch(index) {
+        case 0:
+            return kByCompensatedSize;
+        case 1:
+            return kOldestLargestSeqFirst;
+        case 2:
+            return kOldestSmallestSeqFirst;
+        case 3:
+            return kMinOverlappingRatio;
+        default:
+            assert(false); 
+    }
+}
+
+void VersionStorageInfo::UpdateFilesByCompactionPri(
+    CompactionPri compaction_pri, Trainer * rocksdb_trainer_) {
+  if (compaction_style_ == kCompactionStyleNone ||
+      compaction_style_ == kCompactionStyleFIFO ||
+      compaction_style_ == kCompactionStyleUniversal) {
+    // don't need this
+    return;
+  }
+   
+  // No need to sort the highest level because it is never compacted.
+  for (int level = 0; level < num_levels() - 1; level++) {
+    const std::vector<FileMetaData*>& files = files_[level];
+    auto& files_by_compaction_pri = files_by_compaction_pri_[level];
+    assert(files_by_compaction_pri.size() == 0);
+
+    // populate a temp vector for sorting based on size
+    std::vector<Fsize> temp(files.size());
+    for (size_t i = 0; i < files.size(); i++) {
+      temp[i].index = i;
+      temp[i].file = files[i];
+    }
+
+    // sort the top number_of_files_to_sort_ based on file size
+    size_t num = VersionStorageInfo::kNumberFilesToSort;
+    
+    if (compaction_pri == kDQNPolicy) {
+      std::vector<unsigned char> state;
+      /*TODO : obtain state*/
+      /*TODO : calculate epoch */
+      double epsilon = rocksdb_trainer_->epsilon_by_frame();
+      auto r = ((double) rand() / (RAND_MAX));
+      torch::Tensor state_tensor = rocksdb_trainer_->get_tensor_observation(state);
+   
+      if (r <= epsilon){
+        compaction_pri = retCompactionPri(rand() % 4);
+      } else {
+        torch::Tensor action_tensor = rocksdb_trainer_->network.act(state_tensor);
+        int64_t index = action_tensor[0].item<int64_t>();
+        compaction_pri = retCompactionPri(index);
+      }
+    }
+    
+    if (num > temp.size()) {
+      num = temp.size();
+    }
+    
     switch (compaction_pri) {
       case kByCompensatedSize:
         std::partial_sort(temp.begin(), temp.begin() + num, temp.end(),
@@ -3927,8 +4040,414 @@ Status VersionSet::ProcessManifestWrites(
   return s;
 }
 
+Status VersionSet::ProcessManifestWrites(
+    std::deque<ManifestWriter>& writers, InstrumentedMutex* mu,
+    Directory* db_directory, bool new_descriptor_log,
+    const ColumnFamilyOptions* new_cf_options, Trainer * rocksdb_trainer_) {
+  assert(!writers.empty());
+  ManifestWriter& first_writer = writers.front();
+  ManifestWriter* last_writer = &first_writer;
+
+  assert(!manifest_writers_.empty());
+  assert(manifest_writers_.front() == &first_writer);
+
+  autovector<VersionEdit*> batch_edits;
+  autovector<Version*> versions;
+  autovector<const MutableCFOptions*> mutable_cf_options_ptrs;
+  std::vector<std::unique_ptr<BaseReferencedVersionBuilder>> builder_guards;
+
+  if (first_writer.edit_list.front()->IsColumnFamilyManipulation()) {
+    // No group commits for column family add or drop
+    LogAndApplyCFHelper(first_writer.edit_list.front());
+    batch_edits.push_back(first_writer.edit_list.front());
+  } else {
+    auto it = manifest_writers_.cbegin();
+    size_t group_start = std::numeric_limits<size_t>::max();
+    while (it != manifest_writers_.cend()) {
+      if ((*it)->edit_list.front()->IsColumnFamilyManipulation()) {
+        // no group commits for column family add or drop
+        break;
+      }
+      last_writer = *(it++);
+      assert(last_writer != nullptr);
+      assert(last_writer->cfd != nullptr);
+      if (last_writer->cfd->IsDropped()) {
+        // If we detect a dropped CF at this point, and the corresponding
+        // version edits belong to an atomic group, then we need to find out
+        // the preceding version edits in the same atomic group, and update
+        // their `remaining_entries_` member variable because we are NOT going
+        // to write the version edits' of dropped CF to the MANIFEST. If we
+        // don't update, then Recover can report corrupted atomic group because
+        // the `remaining_entries_` do not match.
+        if (!batch_edits.empty()) {
+          if (batch_edits.back()->is_in_atomic_group_ &&
+              batch_edits.back()->remaining_entries_ > 0) {
+            assert(group_start < batch_edits.size());
+            const auto& edit_list = last_writer->edit_list;
+            size_t k = 0;
+            while (k < edit_list.size()) {
+              if (!edit_list[k]->is_in_atomic_group_) {
+                break;
+              } else if (edit_list[k]->remaining_entries_ == 0) {
+                ++k;
+                break;
+              }
+              ++k;
+            }
+            for (auto i = group_start; i < batch_edits.size(); ++i) {
+              assert(static_cast<uint32_t>(k) <=
+                     batch_edits.back()->remaining_entries_);
+              batch_edits[i]->remaining_entries_ -= static_cast<uint32_t>(k);
+            }
+          }
+        }
+        continue;
+      }
+      // We do a linear search on versions because versions is small.
+      // TODO(yanqin) maybe consider unordered_map
+      Version* version = nullptr;
+      VersionBuilder* builder = nullptr;
+      for (int i = 0; i != static_cast<int>(versions.size()); ++i) {
+        uint32_t cf_id = last_writer->cfd->GetID();
+        if (versions[i]->cfd()->GetID() == cf_id) {
+          version = versions[i];
+          assert(!builder_guards.empty() &&
+                 builder_guards.size() == versions.size());
+          builder = builder_guards[i]->version_builder();
+          TEST_SYNC_POINT_CALLBACK(
+              "VersionSet::ProcessManifestWrites:SameColumnFamily", &cf_id);
+          break;
+        }
+      }
+      if (version == nullptr) {
+        version = new Version(last_writer->cfd, this, env_options_,
+                              last_writer->mutable_cf_options,
+                              current_version_number_++);
+        versions.push_back(version);
+        mutable_cf_options_ptrs.push_back(&last_writer->mutable_cf_options);
+        builder_guards.emplace_back(
+            new BaseReferencedVersionBuilder(last_writer->cfd));
+        builder = builder_guards.back()->version_builder();
+      }
+      assert(builder != nullptr);  // make checker happy
+      for (const auto& e : last_writer->edit_list) {
+        if (e->is_in_atomic_group_) {
+          if (batch_edits.empty() || !batch_edits.back()->is_in_atomic_group_ ||
+              (batch_edits.back()->is_in_atomic_group_ &&
+               batch_edits.back()->remaining_entries_ == 0)) {
+            group_start = batch_edits.size();
+          }
+        } else if (group_start != std::numeric_limits<size_t>::max()) {
+          group_start = std::numeric_limits<size_t>::max();
+        }
+        Status s = LogAndApplyHelper(last_writer->cfd, builder, e, mu);
+        if (!s.ok()) {
+          // free up the allocated memory
+          for (auto v : versions) {
+            delete v;
+          }
+          return s;
+        }
+        batch_edits.push_back(e);
+      }
+    }
+    for (int i = 0; i < static_cast<int>(versions.size()); ++i) {
+      assert(!builder_guards.empty() &&
+             builder_guards.size() == versions.size());
+      auto* builder = builder_guards[i]->version_builder();
+      Status s = builder->SaveTo(versions[i]->storage_info());
+      if (!s.ok()) {
+        // free up the allocated memory
+        for (auto v : versions) {
+          delete v;
+        }
+        return s;
+      }
+    }
+  }
+
+#ifndef NDEBUG
+  // Verify that version edits of atomic groups have correct
+  // remaining_entries_.
+  size_t k = 0;
+  while (k < batch_edits.size()) {
+    while (k < batch_edits.size() && !batch_edits[k]->is_in_atomic_group_) {
+      ++k;
+    }
+    if (k == batch_edits.size()) {
+      break;
+    }
+    size_t i = k;
+    while (i < batch_edits.size()) {
+      if (!batch_edits[i]->is_in_atomic_group_) {
+        break;
+      }
+      assert(i - k + batch_edits[i]->remaining_entries_ ==
+             batch_edits[k]->remaining_entries_);
+      if (batch_edits[i]->remaining_entries_ == 0) {
+        ++i;
+        break;
+      }
+      ++i;
+    }
+    assert(batch_edits[i - 1]->is_in_atomic_group_);
+    assert(0 == batch_edits[i - 1]->remaining_entries_);
+    std::vector<VersionEdit*> tmp;
+    for (size_t j = k; j != i; ++j) {
+      tmp.emplace_back(batch_edits[j]);
+    }
+    TEST_SYNC_POINT_CALLBACK(
+        "VersionSet::ProcessManifestWrites:CheckOneAtomicGroup", &tmp);
+    k = i;
+  }
+#endif  // NDEBUG
+
+  uint64_t new_manifest_file_size = 0;
+  Status s;
+
+  assert(pending_manifest_file_number_ == 0);
+  if (!descriptor_log_ ||
+      manifest_file_size_ > db_options_->max_manifest_file_size) {
+    TEST_SYNC_POINT("VersionSet::ProcessManifestWrites:BeforeNewManifest");
+    pending_manifest_file_number_ = NewFileNumber();
+    batch_edits.back()->SetNextFile(next_file_number_.load());
+    new_descriptor_log = true;
+  } else {
+    pending_manifest_file_number_ = manifest_file_number_;
+  }
+
+  if (new_descriptor_log) {
+    // if we are writing out new snapshot make sure to persist max column
+    // family.
+    if (column_family_set_->GetMaxColumnFamily() > 0) {
+      first_writer.edit_list.front()->SetMaxColumnFamily(
+          column_family_set_->GetMaxColumnFamily());
+    }
+  }
+
+  {
+    EnvOptions opt_env_opts = env_->OptimizeForManifestWrite(env_options_);
+    mu->Unlock();
+
+    TEST_SYNC_POINT("VersionSet::LogAndApply:WriteManifest");
+    if (!first_writer.edit_list.front()->IsColumnFamilyManipulation()) {
+      for (int i = 0; i < static_cast<int>(versions.size()); ++i) {
+        assert(!builder_guards.empty() &&
+               builder_guards.size() == versions.size());
+        assert(!mutable_cf_options_ptrs.empty() &&
+               builder_guards.size() == versions.size());
+        ColumnFamilyData* cfd = versions[i]->cfd_;
+        builder_guards[i]->version_builder()->LoadTableHandlers(
+            cfd->internal_stats(), cfd->ioptions()->optimize_filters_for_hits,
+            true /* prefetch_index_and_filter_in_cache */,
+            false /* is_initial_load */,
+            mutable_cf_options_ptrs[i]->prefix_extractor.get());
+      }
+    }
+
+    // This is fine because everything inside of this block is serialized --
+    // only one thread can be here at the same time
+    if (new_descriptor_log) {
+      // create new manifest file
+      ROCKS_LOG_INFO(db_options_->info_log, "Creating manifest %" PRIu64 "\n",
+                     pending_manifest_file_number_);
+      std::string descriptor_fname =
+          DescriptorFileName(dbname_, pending_manifest_file_number_);
+      std::unique_ptr<WritableFile> descriptor_file;
+      s = NewWritableFile(env_, descriptor_fname, &descriptor_file,
+                          opt_env_opts);
+      if (s.ok()) {
+        descriptor_file->SetPreallocationBlockSize(
+            db_options_->manifest_preallocation_size);
+
+        std::unique_ptr<WritableFileWriter> file_writer(new WritableFileWriter(
+            std::move(descriptor_file), descriptor_fname, opt_env_opts, env_,
+            nullptr, db_options_->listeners));
+        descriptor_log_.reset(
+            new log::Writer(std::move(file_writer), 0, false));
+        s = WriteCurrentStateToManifest(descriptor_log_.get());
+      }
+    }
+
+    if (!first_writer.edit_list.front()->IsColumnFamilyManipulation()) {
+      for (int i = 0; i < static_cast<int>(versions.size()); ++i) {
+        versions[i]->PrepareApply(*mutable_cf_options_ptrs[i], true, rocksdb_trainer_);
+      }
+    }
+
+    // Write new records to MANIFEST log
+    if (s.ok()) {
+#ifndef NDEBUG
+      size_t idx = 0;
+#endif
+      for (auto& e : batch_edits) {
+        std::string record;
+        if (!e->EncodeTo(&record)) {
+          s = Status::Corruption("Unable to encode VersionEdit:" +
+                                 e->DebugString(true));
+          break;
+        }
+        TEST_KILL_RANDOM("VersionSet::LogAndApply:BeforeAddRecord",
+                         rocksdb_kill_odds * REDUCE_ODDS2);
+#ifndef NDEBUG
+        if (batch_edits.size() > 1 && batch_edits.size() - 1 == idx) {
+          TEST_SYNC_POINT(
+              "VersionSet::ProcessManifestWrites:BeforeWriteLastVersionEdit:0");
+          TEST_SYNC_POINT(
+              "VersionSet::ProcessManifestWrites:BeforeWriteLastVersionEdit:1");
+        }
+        ++idx;
+#endif /* !NDEBUG */
+        s = descriptor_log_->AddRecord(record);
+        if (!s.ok()) {
+          break;
+        }
+      }
+      if (s.ok()) {
+        s = SyncManifest(env_, db_options_, descriptor_log_->file());
+      }
+      if (!s.ok()) {
+        ROCKS_LOG_ERROR(db_options_->info_log, "MANIFEST write %s\n",
+                        s.ToString().c_str());
+      }
+    }
+
+    // If we just created a new descriptor file, install it by writing a
+    // new CURRENT file that points to it.
+    if (s.ok() && new_descriptor_log) {
+      s = SetCurrentFile(env_, dbname_, pending_manifest_file_number_,
+                         db_directory);
+      TEST_SYNC_POINT("VersionSet::ProcessManifestWrites:AfterNewManifest");
+    }
+
+    if (s.ok()) {
+      // find offset in manifest file where this version is stored.
+      new_manifest_file_size = descriptor_log_->file()->GetFileSize();
+    }
+
+    if (first_writer.edit_list.front()->is_column_family_drop_) {
+      TEST_SYNC_POINT("VersionSet::LogAndApply::ColumnFamilyDrop:0");
+      TEST_SYNC_POINT("VersionSet::LogAndApply::ColumnFamilyDrop:1");
+      TEST_SYNC_POINT("VersionSet::LogAndApply::ColumnFamilyDrop:2");
+    }
+
+    LogFlush(db_options_->info_log);
+    TEST_SYNC_POINT("VersionSet::LogAndApply:WriteManifestDone");
+    mu->Lock();
+  }
+
+  // Append the old manifest file to the obsolete_manifest_ list to be deleted
+  // by PurgeObsoleteFiles later.
+  if (s.ok() && new_descriptor_log) {
+    obsolete_manifests_.emplace_back(
+        DescriptorFileName("", manifest_file_number_));
+  }
+
+  // Install the new versions
+  if (s.ok()) {
+    if (first_writer.edit_list.front()->is_column_family_add_) {
+      assert(batch_edits.size() == 1);
+      assert(new_cf_options != nullptr);
+      CreateColumnFamily(*new_cf_options, first_writer.edit_list.front());
+    } else if (first_writer.edit_list.front()->is_column_family_drop_) {
+      assert(batch_edits.size() == 1);
+      first_writer.cfd->SetDropped();
+      if (first_writer.cfd->Unref()) {
+        delete first_writer.cfd;
+      }
+    } else {
+      // Each version in versions corresponds to a column family.
+      // For each column family, update its log number indicating that logs
+      // with number smaller than this should be ignored.
+      for (const auto version : versions) {
+        uint64_t max_log_number_in_batch = 0;
+        uint32_t cf_id = version->cfd_->GetID();
+        for (const auto& e : batch_edits) {
+          if (e->has_log_number_ && e->column_family_ == cf_id) {
+            max_log_number_in_batch =
+                std::max(max_log_number_in_batch, e->log_number_);
+          }
+        }
+        if (max_log_number_in_batch != 0) {
+          assert(version->cfd_->GetLogNumber() <= max_log_number_in_batch);
+          version->cfd_->SetLogNumber(max_log_number_in_batch);
+        }
+      }
+
+      uint64_t last_min_log_number_to_keep = 0;
+      for (auto& e : batch_edits) {
+        if (e->has_min_log_number_to_keep_) {
+          last_min_log_number_to_keep =
+              std::max(last_min_log_number_to_keep, e->min_log_number_to_keep_);
+        }
+      }
+
+      if (last_min_log_number_to_keep != 0) {
+        // Should only be set in 2PC mode.
+        MarkMinLogNumberToKeep2PC(last_min_log_number_to_keep);
+      }
+
+      for (int i = 0; i < static_cast<int>(versions.size()); ++i) {
+        ColumnFamilyData* cfd = versions[i]->cfd_;
+        AppendVersion(cfd, versions[i]);
+      }
+    }
+    manifest_file_number_ = pending_manifest_file_number_;
+    manifest_file_size_ = new_manifest_file_size;
+    prev_log_number_ = first_writer.edit_list.front()->prev_log_number_;
+  } else {
+    std::string version_edits;
+    for (auto& e : batch_edits) {
+      version_edits += ("\n" + e->DebugString(true));
+    }
+    ROCKS_LOG_ERROR(db_options_->info_log,
+                    "Error in committing version edit to MANIFEST: %s",
+                    version_edits.c_str());
+    for (auto v : versions) {
+      delete v;
+    }
+    if (new_descriptor_log) {
+      ROCKS_LOG_INFO(db_options_->info_log,
+                     "Deleting manifest %" PRIu64 " current manifest %" PRIu64
+                     "\n",
+                     manifest_file_number_, pending_manifest_file_number_);
+      descriptor_log_.reset();
+      env_->DeleteFile(
+          DescriptorFileName(dbname_, pending_manifest_file_number_));
+    }
+  }
+
+  pending_manifest_file_number_ = 0;
+
+  // wake up all the waiting writers
+  while (true) {
+    ManifestWriter* ready = manifest_writers_.front();
+    manifest_writers_.pop_front();
+    bool need_signal = true;
+    for (const auto& w : writers) {
+      if (&w == ready) {
+        need_signal = false;
+        break;
+      }
+    }
+    ready->status = s;
+    ready->done = true;
+    if (need_signal) {
+      ready->cv.Signal();
+    }
+    if (ready == last_writer) {
+      break;
+    }
+  }
+  if (!manifest_writers_.empty()) {
+    manifest_writers_.front()->cv.Signal();
+  }
+  return s;
+}
+
 // 'datas' is gramatically incorrect. We still use this notation to indicate
 // that this variable represents a collection of column_family_data.
+//d
 Status VersionSet::LogAndApply(
     const autovector<ColumnFamilyData*>& column_family_datas,
     const autovector<const MutableCFOptions*>& mutable_cf_options_list,
@@ -4005,6 +4524,85 @@ Status VersionSet::LogAndApply(
 
   return ProcessManifestWrites(writers, mu, db_directory, new_descriptor_log,
                                new_cf_options);
+}
+
+/* rocksdb trainer */
+Status VersionSet::LogAndApplyWithTrain(
+    const autovector<ColumnFamilyData*>& column_family_datas,
+    const autovector<const MutableCFOptions*>& mutable_cf_options_list,
+    const autovector<autovector<VersionEdit*>>& edit_lists,
+    InstrumentedMutex* mu, Trainer * rocksdb_trainer_, Directory* db_directory, bool new_descriptor_log,
+    const ColumnFamilyOptions* new_cf_options) {
+  mu->AssertHeld();
+  int num_edits = 0;
+  for (const auto& elist : edit_lists) {
+    num_edits += static_cast<int>(elist.size());
+  }
+  if (num_edits == 0) {
+    return Status::OK();
+  } else if (num_edits > 1) {
+#ifndef NDEBUG
+    for (const auto& edit_list : edit_lists) {
+      for (const auto& edit : edit_list) {
+        assert(!edit->IsColumnFamilyManipulation());
+      }
+    }
+#endif /* ! NDEBUG */
+  }
+
+  int num_cfds = static_cast<int>(column_family_datas.size());
+  if (num_cfds == 1 && column_family_datas[0] == nullptr) {
+    assert(edit_lists.size() == 1 && edit_lists[0].size() == 1);
+    assert(edit_lists[0][0]->is_column_family_add_);
+    assert(new_cf_options != nullptr);
+  }
+  std::deque<ManifestWriter> writers;
+  if (num_cfds > 0) {
+    assert(static_cast<size_t>(num_cfds) == mutable_cf_options_list.size());
+    assert(static_cast<size_t>(num_cfds) == edit_lists.size());
+  }
+  for (int i = 0; i < num_cfds; ++i) {
+    writers.emplace_back(mu, column_family_datas[i],
+                         *mutable_cf_options_list[i], edit_lists[i]);
+    manifest_writers_.push_back(&writers[i]);
+  }
+  assert(!writers.empty());
+  ManifestWriter& first_writer = writers.front();
+  while (!first_writer.done && &first_writer != manifest_writers_.front()) {
+    first_writer.cv.Wait();
+  }
+  if (first_writer.done) {
+    // All non-CF-manipulation operations can be grouped together and committed
+    // to MANIFEST. They should all have finished. The status code is stored in
+    // the first manifest writer.
+#ifndef NDEBUG
+    for (const auto& writer : writers) {
+      assert(writer.done);
+    }
+#endif /* !NDEBUG */
+    return first_writer.status;
+  }
+
+  int num_undropped_cfds = 0;
+  for (auto cfd : column_family_datas) {
+    // if cfd == nullptr, it is a column family add.
+    if (cfd == nullptr || !cfd->IsDropped()) {
+      ++num_undropped_cfds;
+    }
+  }
+  if (0 == num_undropped_cfds) {
+    for (int i = 0; i != num_cfds; ++i) {
+      manifest_writers_.pop_front();
+    }
+    // Notify new head of manifest write queue.
+    if (!manifest_writers_.empty()) {
+      manifest_writers_.front()->cv.Signal();
+    }
+    return Status::ColumnFamilyDropped();
+  }
+
+  return ProcessManifestWrites(writers, mu, db_directory, new_descriptor_log,
+                               new_cf_options, rocksdb_trainer_);
 }
 
 void VersionSet::LogAndApplyCFHelper(VersionEdit* edit) {

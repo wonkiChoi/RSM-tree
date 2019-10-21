@@ -47,6 +47,7 @@
 #include "table/get_context.h"
 #include "table/multiget_context.h"
 #include "trace_replay/block_cache_tracer.h"
+#include "db/policy_rl/Trainer.h"
 
 namespace rocksdb {
 
@@ -176,6 +177,8 @@ class VersionStorageInfo {
   // record results in files_by_compaction_pri_. The largest files are listed
   // first.
   void UpdateFilesByCompactionPri(CompactionPri compaction_pri);
+  
+  void UpdateFilesByCompactionPri(CompactionPri compaction_pri, Trainer * rocksdb_trainer_);
 
   void GenerateLevel0NonOverlapping();
   bool level0_non_overlapping() const {
@@ -603,6 +606,9 @@ class Version {
   // to be called before applying the version to the version set.
   void PrepareApply(const MutableCFOptions& mutable_cf_options,
                     bool update_stats);
+  
+  void PrepareApply(const MutableCFOptions& mutable_cf_options,
+                    bool update_stats, Trainer * rocksdb_trainer_);
 
   // Reference count management (so Versions do not disappear out from
   // under live iterators)
@@ -839,6 +845,24 @@ class VersionSet {
     return LogAndApply(cfds, mutable_cf_options_list, edit_lists, mu,
                        db_directory, new_descriptor_log, column_family_options);
   }
+  /* trainer */
+  Status LogAndApplyWithTrain(
+      ColumnFamilyData* column_family_data,
+      const MutableCFOptions& mutable_cf_options, VersionEdit* edit,
+      InstrumentedMutex* mu, Trainer * rocksdb_trainer_, Directory* db_directory = nullptr,
+      bool new_descriptor_log = false,
+      const ColumnFamilyOptions* column_family_options = nullptr) {
+    autovector<ColumnFamilyData*> cfds;
+    cfds.emplace_back(column_family_data);
+    autovector<const MutableCFOptions*> mutable_cf_options_list;
+    mutable_cf_options_list.emplace_back(&mutable_cf_options);
+    autovector<autovector<VersionEdit*>> edit_lists;
+    autovector<VersionEdit*> edit_list;
+    edit_list.emplace_back(edit);
+    edit_lists.emplace_back(edit_list);
+    return LogAndApplyWithTrain(cfds, mutable_cf_options_list, edit_lists, mu, rocksdb_trainer_,
+                       db_directory, new_descriptor_log, column_family_options);
+  }
 
   // The across-multi-cf batch version. If edit_lists contain more than
   // 1 version edits, caller must ensure that no edit in the []list is column
@@ -848,6 +872,14 @@ class VersionSet {
       const autovector<const MutableCFOptions*>& mutable_cf_options_list,
       const autovector<autovector<VersionEdit*>>& edit_lists,
       InstrumentedMutex* mu, Directory* db_directory = nullptr,
+      bool new_descriptor_log = false,
+      const ColumnFamilyOptions* new_cf_options = nullptr);
+  
+  virtual Status LogAndApplyWithTrain(
+      const autovector<ColumnFamilyData*>& cfds,
+      const autovector<const MutableCFOptions*>& mutable_cf_options_list,
+      const autovector<autovector<VersionEdit*>>& edit_lists,
+      InstrumentedMutex* mu, Trainer * rocksdb_trainer, Directory* db_directory = nullptr,
       bool new_descriptor_log = false,
       const ColumnFamilyOptions* new_cf_options = nullptr);
 
@@ -1152,6 +1184,11 @@ class VersionSet {
                                InstrumentedMutex* mu, Directory* db_directory,
                                bool new_descriptor_log,
                                const ColumnFamilyOptions* new_cf_options);
+  
+  Status ProcessManifestWrites(std::deque<ManifestWriter>& writers,
+                               InstrumentedMutex* mu, Directory* db_directory,
+                               bool new_descriptor_log,
+                               const ColumnFamilyOptions* new_cf_options, Trainer * rocksdb_trainer_);
 
   void LogAndApplyCFHelper(VersionEdit* edit);
   Status LogAndApplyHelper(ColumnFamilyData* cfd, VersionBuilder* b,

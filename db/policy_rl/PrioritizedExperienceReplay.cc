@@ -26,10 +26,10 @@ PrioritizedExperienceReplay::PrioritizedExperienceReplay(int64_t size) {
 }
 
 void PrioritizedExperienceReplay::push(torch::Tensor state,torch::Tensor new_state,torch::
-Tensor action,torch::Tensor done,torch::Tensor reward, float_t td_error, int64_t ind){
+Tensor action,torch::Tensor reward, float_t td_error, int64_t ind){
     float_t error(td_error);
     int64_t index(ind);
-    std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> sample (state, new_state, action, reward, done);
+    std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> sample (state, new_state, action, reward);
     element sample_struct(error, index, sample);
 
     if (buffer.size() < capacity){
@@ -43,14 +43,14 @@ Tensor action,torch::Tensor done,torch::Tensor reward, float_t td_error, int64_t
     }
 }
 
-std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>>
+std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>>
 PrioritizedExperienceReplay::sample_queue(
         int64_t batch_size){
-    std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>> b(batch_size);
+    std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>> b(batch_size);
     while (batch_size > 0 and buffer.size() > 0){
         element s = buffer.top();
         buffer.pop();
-        std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> sample = s.transition;
+        std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> sample = s.transition;
         b.push_back(sample);
     }
     return b;
