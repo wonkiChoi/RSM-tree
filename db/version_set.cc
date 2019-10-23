@@ -2749,6 +2749,27 @@ void VersionStorageInfo::UpdateFilesByCompactionPri(
     return;
   }
    
+  if (compaction_pri == kDQNPolicy) {
+    std::vector<unsigned char> state;
+    /*TODO : obtain state*/
+    /*TODO : calculate epoch */
+    double epsilon = rocksdb_trainer_->epsilon_by_frame();
+    auto r = ((double) rand() / (RAND_MAX));
+    torch::Tensor state_tensor = rocksdb_trainer_->get_tensor_observation(state);
+    int64_t index = 0;
+      
+    if (r <= epsilon){
+      index = rand() % 4;
+      compaction_pri = retCompactionPri(index);
+      rocksdb_trainer_->previous_action = index;
+    } else {
+      torch::Tensor action_tensor = rocksdb_trainer_->network.act(state_tensor);
+      index = action_tensor[0].item<int64_t>();
+      compaction_pri = retCompactionPri(index);
+      rocksdb_trainer_->previous_action = index;
+    }
+  }
+  
   // No need to sort the highest level because it is never compacted.
   for (int level = 0; level < num_levels() - 1; level++) {
     const std::vector<FileMetaData*>& files = files_[level];
@@ -2764,24 +2785,7 @@ void VersionStorageInfo::UpdateFilesByCompactionPri(
 
     // sort the top number_of_files_to_sort_ based on file size
     size_t num = VersionStorageInfo::kNumberFilesToSort;
-    
-    if (compaction_pri == kDQNPolicy) {
-      std::vector<unsigned char> state;
-      /*TODO : obtain state*/
-      /*TODO : calculate epoch */
-      double epsilon = rocksdb_trainer_->epsilon_by_frame();
-      auto r = ((double) rand() / (RAND_MAX));
-      torch::Tensor state_tensor = rocksdb_trainer_->get_tensor_observation(state);
-   
-      if (r <= epsilon){
-        compaction_pri = retCompactionPri(rand() % 4);
-      } else {
-        torch::Tensor action_tensor = rocksdb_trainer_->network.act(state_tensor);
-        int64_t index = action_tensor[0].item<int64_t>();
-        compaction_pri = retCompactionPri(index);
-      }
-    }
-    
+        
     if (num > temp.size()) {
       num = temp.size();
     }

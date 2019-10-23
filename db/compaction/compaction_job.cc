@@ -869,8 +869,13 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
   ColumnFamilyData* cfd = compact_->compaction->column_family_data();
   cfd->internal_stats()->AddCompactionStats(
       compact_->compaction->output_level(), thread_pri_, compaction_stats_);
-
-  rocksdb_trainer_->frame_id = job_id_;
+  
+  int64_t prev_act = 0;
+  if (compact_->compaction->immutable_cf_options()->compaction_pri == kDQNPolicy) {
+    rocksdb_trainer_->frame_id = job_id_;
+    prev_act = rocksdb_trainer_->previous_action;
+  }
+  
   if (status.ok()) {
     status = InstallCompactionResults(mutable_cf_options);
   }
@@ -921,8 +926,14 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
   
   if (compact_->compaction->immutable_cf_options()->compaction_pri == kDQNPolicy) {
     float reward = write_amp;
+
+    mutable_cf_options.target_file_size_base; // 32 * 1048576;
+    mutable_cf_options.target_file_size_multiplier; //  = 1
+    mutable_cf_options.max_bytes_for_level_base; // 256 * 1048576
+    mutable_cf_options.max_bytes_for_level_multiplier; // 10
+    
       /* ========================= Training Part ======================= */
-    std::vector<unsigned char> new_state;
+    std::vector<uint64_t> new_state;
     torch::Tensor new_state_tensor = rocksdb_trainer_->get_tensor_observation(new_state);
     /*require modification*/
     torch::Tensor state_tensor = rocksdb_trainer_->get_tensor_observation(new_state);
@@ -930,7 +941,7 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
     torch::Tensor reward_tensor = torch::tensor(reward);
     //torch::Tensor done_tensor = torch::tensor(done); /* doen't require done */
     //done_tensor = done_tensor.to(torch::kFloat32);
-    torch::Tensor action_tensor_new = torch::tensor(0);
+    torch::Tensor action_tensor_new = torch::tensor(prev_act);
 
     rocksdb_trainer_->buffer.push(state_tensor, new_state_tensor, action_tensor_new, reward_tensor);
 
@@ -939,12 +950,13 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
       //losses.push_back(loss);
     }
 
-    if (job_id_%1000==0){
-      std::cout<<reward<<std::endl;
+    if (job_id_ % 1000 == 0){
+      std::cout<<"[DQN policy REWARD] : " << reward << std::endl;
       rocksdb_trainer_->loadstatedict(rocksdb_trainer_->network, rocksdb_trainer_->target_network);
     }
   /* ========================= Training Part ======================= */
   }
+  
   UpdateCompactionJobStats(stats);
 
   auto stream = event_logger_->LogToBuffer(log_buffer_);

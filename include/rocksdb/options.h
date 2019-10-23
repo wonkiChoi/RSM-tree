@@ -188,7 +188,7 @@ struct ColumnFamilyOptions : public AdvancedColumnFamilyOptions {
   // Default: 64MB
   //
   // Dynamically changeable through SetOptions() API
-  size_t write_buffer_size = 64 << 20;
+  size_t write_buffer_size = 32 << 20;
 
   // Compress blocks using the specified compression algorithm.
   //

@@ -8,12 +8,13 @@
 #include <chrono>
 
 
-Trainer::Trainer(int64_t input_channels, int64_t num_actions, int64_t capacity, int64_t frame_id_):
+Trainer::Trainer(int64_t input_channels, int64_t num_actions, int64_t capacity, int64_t frame_id_, int64_t previous_action_):
     buffer(capacity),
     network(input_channels, num_actions),
     target_network(input_channels, num_actions),
     dqn_optimizer(network.parameters(), torch::optim::AdamOptions(0.0001).beta1(0.5)),
-    frame_id(frame_id_) {}
+    frame_id(frame_id_),
+    previous_action(previous_action_){}
 
     torch::Tensor Trainer::compute_td_loss(int64_t batch_size_, float gamma_){
       std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>> batch =
@@ -67,7 +68,7 @@ Trainer::Trainer(int64_t input_channels, int64_t num_actions, int64_t capacity, 
         return epsilon_final + (epsilon_start - epsilon_final) * exp(-1. * frame_id / epsilon_decay);
     }
 
-    torch::Tensor Trainer::get_tensor_observation(std::vector<unsigned char> state) {
+    torch::Tensor Trainer::get_tensor_observation(std::vector<uint64_t> state) {
         std::vector<int64_t > state_int;
         state_int.reserve(state.size());
 
