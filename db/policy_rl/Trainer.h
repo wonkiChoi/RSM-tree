@@ -19,11 +19,15 @@ class Trainer {
     float gamma = 0.99;
     int64_t frame_id;
     int64_t previous_action;
+    std::vector<int64_t> state;
+    torch::Tensor state_tensor;
+    int64_t num_level;
+    int64_t max_file_num;
   
     Trainer(int64_t input_channels, int64_t num_actions, int64_t capacity, int64_t frame_id_, int64_t previous_action_);
     torch::Tensor compute_td_loss(int64_t batch_size, float gamma);
     double epsilon_by_frame();
-    torch::Tensor get_tensor_observation(std::vector<uint64_t> state);
+    torch::Tensor get_tensor_observation(std::vector<int64_t> state);
     void loadstatedict(torch::nn::Module& model,
                        torch::nn::Module& target_model);
     void train(int64_t random_seed, std::string rom_path, int64_t num_epochs);

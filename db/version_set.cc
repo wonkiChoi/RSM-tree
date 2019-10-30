@@ -2750,12 +2750,12 @@ void VersionStorageInfo::UpdateFilesByCompactionPri(
   }
    
   if (compaction_pri == kDQNPolicy) {
-    std::vector<unsigned char> state;
-    /*TODO : obtain state*/
-    /*TODO : calculate epoch */
     double epsilon = rocksdb_trainer_->epsilon_by_frame();
     auto r = ((double) rand() / (RAND_MAX));
-    torch::Tensor state_tensor = rocksdb_trainer_->get_tensor_observation(state);
+    torch::Tensor state_tensor = rocksdb_trainer_->get_tensor_observation(rocksdb_trainer_->state);
+    rocksdb_trainer_->state.clear();
+    rocksdb_trainer_->state_tensor = state_tensor;
+    
     int64_t index = 0;
       
     if (r <= epsilon){

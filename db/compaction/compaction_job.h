@@ -78,7 +78,7 @@ class CompactionJob {
       const std::string& dbname, CompactionJobStats* compaction_job_stats,
       Env::Priority thread_pri, SnapshotListFetchCallback* snap_list_callback);
   
-    CompactionJob(
+  CompactionJob(
       int job_id, Compaction* compaction, const ImmutableDBOptions& db_options,
       const EnvOptions env_options, VersionSet* versions,
       const std::atomic<bool>* shutting_down,

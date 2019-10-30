@@ -68,15 +68,15 @@ Trainer::Trainer(int64_t input_channels, int64_t num_actions, int64_t capacity, 
         return epsilon_final + (epsilon_start - epsilon_final) * exp(-1. * frame_id / epsilon_decay);
     }
 
-    torch::Tensor Trainer::get_tensor_observation(std::vector<uint64_t> state) {
-        std::vector<int64_t > state_int;
-        state_int.reserve(state.size());
+    torch::Tensor Trainer::get_tensor_observation(std::vector<int64_t> state) {
+//        std::vector<int64_t > state_int;
+//        state_int.reserve(state.size());
+//
+//        for (uint i=0; i<state.size(); i++){
+//            state_int.push_back(int64_t(state[i]));
+//        }
 
-        for (uint i=0; i<state.size(); i++){
-            state_int.push_back(int64_t(state[i]));
-        }
-
-        torch::Tensor state_tensor = torch::from_blob(state_int.data(), {1, 3, 210, 160});
+        torch::Tensor state_tensor = torch::from_blob(state.data(), {1, 3, num_level, max_file_num});
         return state_tensor;
     }
 
