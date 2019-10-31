@@ -877,7 +877,7 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
   
   int64_t prev_act = 0;
   uint num_levels = vstorage->num_levels();
-  uint max_level_bytes = pow(mutable_cf_options.max_bytes_for_level_multiplier, num_levels - 1);
+  uint max_level_bytes = mutable_cf_options.max_bytes_for_level_base * pow(mutable_cf_options.max_bytes_for_level_multiplier, num_levels - 1);
   uint approx_max_file_num = (max_level_bytes / mutable_cf_options.target_file_size_base) + 1;
     
   if (compact_->compaction->immutable_cf_options()->compaction_pri == kDQNPolicy) {
