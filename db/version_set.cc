@@ -3643,6 +3643,7 @@ Status VersionSet::ProcessManifestWrites(
     std::deque<ManifestWriter>& writers, InstrumentedMutex* mu,
     Directory* db_directory, bool new_descriptor_log,
     const ColumnFamilyOptions* new_cf_options) {
+  
   assert(!writers.empty());
   ManifestWriter& first_writer = writers.front();
   ManifestWriter* last_writer = &first_writer;
@@ -4905,6 +4906,7 @@ Status VersionSet::Recover(
   for (auto cf : column_families) {
     cf_name_to_options.insert({cf.name, cf.options});
   }
+      std::cout << "Recover" << std::endl;
   // keeps track of column families in manifest that were not found in
   // column families parameters. if those column families are not dropped
   // by subsequent manifest records, Recover() will return failure status
@@ -5243,6 +5245,7 @@ Status VersionSet::DumpManifest(Options& options, std::string& dscname,
                                 bool verbose, bool hex, bool json) {
   // Open the specified manifest file.
   std::unique_ptr<SequentialFileReader> file_reader;
+      std::cout << "DumpManifest" << std::endl;
   Status s;
   {
     std::unique_ptr<SequentialFile> file;
@@ -6040,6 +6043,7 @@ Status ReactiveVersionSet::Recover(
     std::unique_ptr<log::FragmentBufferedReader>* manifest_reader,
     std::unique_ptr<log::Reader::Reporter>* manifest_reporter,
     std::unique_ptr<Status>* manifest_reader_status) {
+        std::cout << "Recover22" << std::endl;
   assert(manifest_reader != nullptr);
   assert(manifest_reporter != nullptr);
   assert(manifest_reader_status != nullptr);
@@ -6316,6 +6320,7 @@ Status ReactiveVersionSet::ReadAndApply(
 Status ReactiveVersionSet::ApplyOneVersionEditToBuilder(
     VersionEdit& edit, std::unordered_set<ColumnFamilyData*>* cfds_changed,
     VersionEdit* version_edit) {
+        std::cout << "ApplyOneVersionEditToBuilder" << std::endl;
   ColumnFamilyData* cfd =
       column_family_set_->GetColumnFamily(edit.column_family_);
 

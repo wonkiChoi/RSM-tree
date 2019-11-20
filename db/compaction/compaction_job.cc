@@ -870,15 +870,13 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
   cfd->internal_stats()->AddCompactionStats(
       compact_->compaction->output_level(), thread_pri_, compaction_stats_);
   
-    
-  VersionStorageInfo::LevelSummaryStorage tmp;
-  auto vstorage = cfd->current()->storage_info();
-  const auto& stats = compaction_stats_;
-  
+ 
+  auto ostorage = cfd->GetSuperVersion()->current->storage_info();
   int64_t prev_act = 0;
-  uint num_levels = vstorage->num_levels();
+  uint num_levels = ostorage->num_levels();
   uint max_level_bytes = mutable_cf_options.max_bytes_for_level_base * pow(mutable_cf_options.max_bytes_for_level_multiplier, num_levels - 1);
   uint approx_max_file_num = (max_level_bytes / mutable_cf_options.target_file_size_base) + 1;
+  
     
   if (compact_->compaction->immutable_cf_options()->compaction_pri == kDQNPolicy) {
     rocksdb_trainer_->num_level = num_levels;
@@ -886,7 +884,6 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
     rocksdb_trainer_->frame_id = job_id_;
     prev_act = rocksdb_trainer_->previous_action;
     
-    auto ostorage = cfd->GetSuperVersion()->current->storage_info();
     for(uint i = 0; i < num_levels; i++) {
         std::vector<FileMetaData*> files = ostorage->LevelFiles(i);
         for(uint j = 0; j < approx_max_file_num; j++) {
@@ -903,12 +900,13 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
     }
   }
   
-  
-  
-  
   if (status.ok()) {
     status = InstallCompactionResults(mutable_cf_options);
   }
+        
+  VersionStorageInfo::LevelSummaryStorage tmp;
+  auto vstorage = cfd->current()->storage_info();
+  const auto& stats = compaction_stats_;
 
   double read_write_amp = 0.0;
   double write_amp = 0.0;
