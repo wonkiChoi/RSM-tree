@@ -17,7 +17,6 @@
 
 
 ExperienceReplay::ExperienceReplay(int64_t size) {
-
     capacity = size;
 }
 
@@ -42,7 +41,7 @@ void ExperienceReplay::push(torch::Tensor state,torch::Tensor new_state,torch::
         
         std::random_device rd;
         std::mt19937 random(rd());
-        std::uniform_int_distribution<uint> range(0, buffer.size());
+        std::uniform_int_distribution<uint> range(0, buffer.size()-1);
         
         for(uint i = 0; i < b.size(); i++) {
             uint idx = range(random);
@@ -53,6 +52,5 @@ void ExperienceReplay::push(torch::Tensor state,torch::Tensor new_state,torch::
     }
 
     int64_t ExperienceReplay::size_buffer(){
-
         return buffer.size();
 }

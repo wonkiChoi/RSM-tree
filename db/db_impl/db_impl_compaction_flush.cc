@@ -2732,7 +2732,7 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
         this, env_, c->mutable_cf_options()->snap_refresh_nanos,
         immutable_db_options_.info_log.get());
     CompactionJob compaction_job(
-        job_context->job_id, c.get(), immutable_db_options_,
+        job_context->job_id, compaction_id_.fetch_add(1), c.get(), immutable_db_options_,
         env_options_for_compaction_, versions_.get(), &shutting_down_,
         preserve_deletes_seqnum_.load(), log_buffer, directories_.GetDbDir(),
         GetDataDir(c->column_family_data(), c->output_path_id()), stats_,

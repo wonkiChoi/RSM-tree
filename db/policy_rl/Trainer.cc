@@ -17,6 +17,7 @@ Trainer::Trainer(int64_t input_channels, int64_t num_actions, int64_t capacity, 
     previous_action(previous_action_){}
 
     torch::Tensor Trainer::compute_td_loss(int64_t batch_size_, float gamma_){
+        std::cout << "compute_td_loss" << std::endl;
       std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>> batch =
         buffer.sample_queue(batch_size_);
 
@@ -44,22 +45,33 @@ Trainer::Trainer(int64_t input_channels, int64_t num_actions, int64_t capacity, 
         rewards_tensor = torch::cat(rewards, 0);
 
 
+        std::cout << "forward " <<std::endl;
         torch::Tensor q_values = network.forward(states_tensor);
+        std::cout << "target_ forward " <<std::endl;
         torch::Tensor next_target_q_values = target_network.forward(new_states_tensor);
+        std::cout << "next forward " <<std::endl;
         torch::Tensor next_q_values = network.forward(new_states_tensor);
 
+        std::cout << "action " <<std::endl;
         actions_tensor = actions_tensor.to(torch::kInt64);
 
+        std::cout << "q " <<std::endl;
         torch::Tensor q_value = q_values.gather(1, actions_tensor.unsqueeze(1)).squeeze(1);
+        std::cout << "q1 " <<std::endl;
         torch::Tensor maximum = std::get<1>(next_q_values.max(1));
+        std::cout << "q2 " <<std::endl;
         torch::Tensor next_q_value = next_target_q_values.gather(1, maximum.unsqueeze(1)).squeeze(1);
+        std::cout << "q3 " <<std::endl;
         torch::Tensor expected_q_value = rewards_tensor + gamma*next_q_value;
+        std::cout << "q4 " <<std::endl;
         torch::Tensor loss = torch::mse_loss(q_value, expected_q_value);
+        std::cout << "loss " <<std::endl;
 
         dqn_optimizer.zero_grad();
         loss.backward();
         dqn_optimizer.step();
 
+        std::cout << "step over " <<std::endl;
         return loss;
 
     }
@@ -69,14 +81,8 @@ Trainer::Trainer(int64_t input_channels, int64_t num_actions, int64_t capacity, 
     }
 
     torch::Tensor Trainer::get_tensor_observation(std::vector<int64_t> state) {
-//        std::vector<int64_t > state_int;
-//        state_int.reserve(state.size());
-//
-//        for (uint i=0; i<state.size(); i++){
-//            state_int.push_back(int64_t(state[i]));
-//        }
-
         torch::Tensor state_tensor = torch::from_blob(state.data(), {1, 3, num_level, max_file_num});
+//        std::cout << state_tensor << std::endl;
         return state_tensor;
     }
 

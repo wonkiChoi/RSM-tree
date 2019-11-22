@@ -195,6 +195,7 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
       delete_obsolete_files_last_run_(env_->NowMicros()),
       last_stats_dump_time_microsec_(0),
       next_job_id_(1),
+      compaction_id_(0),
       has_unpersisted_data_(false),
       unable_to_release_oldest_log_(false),
       num_running_ingest_file_(0),
@@ -229,7 +230,7 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
       closed_(false),
       error_handler_(this, immutable_db_options_, &mutex_),
       atomic_flush_install_cv_(&mutex_),
-      rocksdb_trainer(Trainer(3,4,100000,0,0)) {
+      rocksdb_trainer(Trainer(3,4,64,0,0)) {
   // !batch_per_trx_ implies seq_per_batch_ because it is only unset for
   // WriteUnprepared, which should use seq_per_batch_.
   assert(batch_per_txn_ || seq_per_batch_);

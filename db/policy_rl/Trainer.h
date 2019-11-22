@@ -12,7 +12,7 @@ class Trainer {
     ExperienceReplay buffer;
     DQN network, target_network;
     torch::optim::Adam dqn_optimizer;
-    double epsilon_start = 1.0;
+    double epsilon_start = 0.8;
     double epsilon_final = 0.01;
     int64_t epsilon_decay = 30000;
     int64_t batch_size = 32;

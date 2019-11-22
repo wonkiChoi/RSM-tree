@@ -79,7 +79,7 @@ class CompactionJob {
       Env::Priority thread_pri, SnapshotListFetchCallback* snap_list_callback);
   
   CompactionJob(
-      int job_id, Compaction* compaction, const ImmutableDBOptions& db_options,
+      int job_id, int compaction_id, Compaction* compaction, const ImmutableDBOptions& db_options,
       const EnvOptions env_options, VersionSet* versions,
       const std::atomic<bool>* shutting_down,
       const SequenceNumber preserve_deletes_seqnum, LogBuffer* log_buffer,
@@ -155,6 +155,7 @@ class CompactionJob {
   void LogCompaction();
 
   int job_id_;
+  int compaction_id_;
 
   // CompactionJob state
   struct CompactionState;

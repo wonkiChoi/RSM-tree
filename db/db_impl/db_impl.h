@@ -1844,6 +1844,8 @@ class DBImpl : public DB {
   // Each flush or compaction gets its own job id. this counter makes sure
   // they're unique
   std::atomic<int> next_job_id_;
+  
+  std::atomic<int> compaction_id_;
 
   // A flag indicating whether the current rocksdb database has any
   // data that is not yet persisted into either WAL or SST file.
