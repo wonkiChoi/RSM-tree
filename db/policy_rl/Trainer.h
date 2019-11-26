@@ -30,6 +30,5 @@ class Trainer {
     torch::Tensor get_tensor_observation(std::vector<int64_t> state);
     void loadstatedict(torch::nn::Module& model,
                        torch::nn::Module& target_model);
-    void train(int64_t random_seed, std::string rom_path, int64_t num_epochs);
 
 };

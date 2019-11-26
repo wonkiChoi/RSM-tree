@@ -37,17 +37,25 @@ void ExperienceReplay::push(torch::Tensor state,torch::Tensor new_state,torch::
 
     std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>> ExperienceReplay::sample_queue(
             int64_t batch_size){
-        std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>> b(batch_size);
-        
+       // std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>> b(batch_size);
+        std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>> b;
+
         std::random_device rd;
         std::mt19937 random(rd());
         std::uniform_int_distribution<uint> range(0, buffer.size()-1);
+        std::vector<uint> indices;
+        std::vector<uint>::iterator iter;
+        uint num_entries = 0;
         
-        for(uint i = 0; i < b.size(); i++) {
+        for(;;) {
+            if(num_entries == batch_size) break;
             uint idx = range(random);
-            b.push_back(buffer[idx]);     
+            if ( (find(indices.begin(), indices.end(), idx)) == indices.end() ) {
+              indices.push_back(idx);
+              b.push_back(buffer[idx]);
+              num_entries++;
+            }    
         }
-        
         return b;
     }
 

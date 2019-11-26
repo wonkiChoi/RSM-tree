@@ -885,8 +885,6 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
 //  std::cout << "[job id : "<< job_id_ << "] " << "num_level : " << num_levels << " max_level_bytes : " 
 //          << max_level_bytes << " approx_max_file_num = " << approx_max_file_num << std::endl;
   
-  approx_max_file_num = 64;
-  
   if (compact_->compaction->immutable_cf_options()->compaction_pri == kDQNPolicy) {
     rocksdb_trainer_->num_level = num_levels;
     rocksdb_trainer_->max_file_num = approx_max_file_num;
@@ -914,10 +912,6 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
         } 
       }
     }
-//    for(uint i = 0; i < 3 * num_levels * approx_max_file_num; i++) {
-//      std::cout << "mem : "<< i << " == " << rocksdb_trainer_->state[i] << std::endl;
-//    }
-    
   }
   
   if (status.ok()) {
@@ -969,7 +963,8 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
   
   
   if (compact_->compaction->immutable_cf_options()->compaction_pri == kDQNPolicy) {
-    float reward = 100 - write_amp;
+    //std::cout << "write_amp : " << write_amp << std::endl;
+    float reward = 100 - (100 * write_amp);
 
     /*
     mutable_cf_options.target_file_size_base; // 32 * 1048576;
@@ -982,27 +977,7 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
         
     std::vector<int64_t> new_state;
     new_state.reserve(3*num_levels*approx_max_file_num);
-//    for(uint i = 0; i < num_levels; i++) {
-//        std::vector<FileMetaData*> files = vstorage->LevelFiles(i);
-//        for(unsigned long j = 0; j < approx_max_file_num; j++) {         
-//          if(j < files.size() ) {
-////              std::cout << " small : " << std::stol(files[j]->smallest.user_key().ToString(1), NULL, 16) 
-////                      << " largest: " << std::stol(files[j]->largest.user_key().ToString(1), NULL, 16)
-////                      << " entries : " << files[j]->num_entries << std::endl;
-////              std::cout << 0 * (num_levels * approx_max_file_num) + (approx_max_file_num * i) + j << " - " 
-////                      << 1 * (num_levels * approx_max_file_num) + (approx_max_file_num * i) + j << " - "
-////                      << 2 * (num_levels * approx_max_file_num) + (approx_max_file_num * i) + j << std::endl;
-//              
-//            new_state[0 * (num_levels * approx_max_file_num) + (approx_max_file_num * i) + j] = std::stol(files[j]->smallest.user_key().ToString(1), NULL, 16);
-//            new_state[1 * (num_levels * approx_max_file_num) + (approx_max_file_num * i) + j] = std::stol(files[j]->largest.user_key().ToString(1), NULL, 16);
-//            new_state[2 * (num_levels * approx_max_file_num) + (approx_max_file_num * i) + j] = files[j]->num_entries;           
-//          } else {
-//            new_state[0 * (num_levels * approx_max_file_num) + (approx_max_file_num * i) + j] = 0;
-//            new_state[1 * (num_levels * approx_max_file_num) + (approx_max_file_num * i) + j] = 0;
-//            new_state[2 * (num_levels * approx_max_file_num) + (approx_max_file_num * i) + j] = 0;
-//          }
-//        } 
-//    }
+
     for(uint i = 0; i < 3; i++) {
       for(uint j = 0; j < num_levels; j++) {
         std::vector<FileMetaData*> files = vstorage->LevelFiles(j);
@@ -1039,7 +1014,6 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
     rocksdb_trainer_->buffer.push(state_tensor, new_state_tensor, action_tensor_new, reward_tensor);
 
     if (rocksdb_trainer_->buffer.size_buffer() >= 64){
-      std::cout << "buffer overflow " << std::endl;
       torch::Tensor loss = rocksdb_trainer_->compute_td_loss(rocksdb_trainer_->batch_size, rocksdb_trainer_->gamma);
       //losses.push_back(loss);
     }

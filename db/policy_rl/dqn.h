@@ -20,7 +20,7 @@ struct DQN : torch::nn::Module{
 //                          .stride(1)
 //                          ),
 
-            linear1(torch::nn::Linear(64*2*62, 512)),
+            linear1(torch::nn::Linear(64*2*7998, 512)),
             output(torch::nn::Linear(512, num_actions)){}
 
     torch::Tensor forward(torch::Tensor input) {
