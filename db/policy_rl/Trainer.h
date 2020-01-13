@@ -21,8 +21,6 @@ class Trainer {
     int64_t previous_action;
     std::vector<int64_t> state;
     torch::Tensor state_tensor;
-    int64_t num_level;
-    int64_t max_file_num;
   
     Trainer(int64_t input_channels, int64_t num_actions, int64_t capacity, int64_t frame_id_, int64_t previous_action_);
     torch::Tensor compute_td_loss(int64_t batch_size, float gamma);

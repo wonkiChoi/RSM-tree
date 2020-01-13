@@ -42,7 +42,6 @@ Trainer::Trainer(int64_t input_channels, int64_t num_actions, int64_t capacity, 
         actions_tensor = torch::cat(actions, 0);
         rewards_tensor = torch::cat(rewards, 0);
 
-
         torch::Tensor q_values = network.forward(states_tensor);
         torch::Tensor next_target_q_values = target_network.forward(new_states_tensor);
         torch::Tensor next_q_values = network.forward(new_states_tensor);
@@ -68,7 +67,7 @@ Trainer::Trainer(int64_t input_channels, int64_t num_actions, int64_t capacity, 
     }
 
     torch::Tensor Trainer::get_tensor_observation(std::vector<int64_t> state) {
-        torch::Tensor state_tensor = torch::from_blob(state.data(), {1, 3, num_level, max_file_num});
+        torch::Tensor state_tensor = torch::from_blob(state.data(), {1, 4, 4096});
         return state_tensor;
     }
 
