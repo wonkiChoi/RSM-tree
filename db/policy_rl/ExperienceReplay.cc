@@ -22,7 +22,7 @@ ExperienceReplay::ExperienceReplay(int64_t size) {
 
 void ExperienceReplay::push(torch::Tensor state,torch::Tensor new_state,torch::
     Tensor action, torch::Tensor reward){
-
+    
     std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> sample (state, new_state, action, reward);
         if (buffer.size() < capacity){
             buffer.push_back(sample);
@@ -44,7 +44,6 @@ void ExperienceReplay::push(torch::Tensor state,torch::Tensor new_state,torch::
         std::mt19937 random(rd());
         std::uniform_int_distribution<uint> range(0, buffer.size()-1);
         std::vector<uint> indices;
-        std::vector<uint>::iterator iter;
         uint num_entries = 0;
         
         for(;;) {

@@ -33,6 +33,7 @@ struct DQN : torch::nn::Module{
         input = input.view({input.size(0), -1});
         input = torch::relu(linear1(input));
         input = output(input);
+
         return input;
     }
 

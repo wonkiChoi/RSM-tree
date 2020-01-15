@@ -878,7 +878,7 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
     rocksdb_trainer_->frame_id = compaction_id_;
     prev_act = rocksdb_trainer_->previous_action;
     auto ostorage = cfd->GetSuperVersion()->current->storage_info();
-    rocksdb_trainer_->state.reserve((cfd->NumberLevels()-1) * 4096);
+    //rocksdb_trainer_->state.reserve((cfd->NumberLevels()-1) * 4096);
 
     for(int i = 1; i < cfd->NumberLevels(); i++) {
       std::vector<FileMetaData*> files = ostorage->LevelFiles(i);
@@ -889,12 +889,12 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
 //        std::cout << "level : [" << i << " -- " << j << "]" << " smallest : "  << files[j]->smallest.user_key().ToString(1).substr(0,2) << std::endl;
 //        std::cout << "level : [" << i << " -- " << j << "]" << " largest : "  << files[j]->largest.user_key().ToString(1).substr(0,2) << std::endl;
         std::string small;
-        small.append("0");
-        small.append(files[j]->smallest.user_key().ToString(1).substr(0,2));
+        //small.append("0x0");
+        small.append(files[j]->smallest.user_key().ToString(1).substr(0,3));
         
         std::string large;
-        large.append("0");
-        large.append(files[j]->largest.user_key().ToString(1).substr(0,2));
+        //large.append("0x0");
+        large.append(files[j]->largest.user_key().ToString(1).substr(0,3));
         int64_t smallest_data = std::stol(small, NULL, 16);
         int64_t largest_data = std::stol(large, NULL, 16);
 //        std::cout << "small Int : " << smallest_data  << std::endl
@@ -908,8 +908,10 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
         }
       }
       
-      for(unsigned int k = 0; k < 4096; k++ )
+      for(unsigned int k = 0; k < 4096; k++ ) {
+        // std::cout << "input k [" << k << "] = " << range_arr[k] << std::endl;  
         rocksdb_trainer_->state.push_back(range_arr[k]);
+      }
         
       delete range_arr;
       
@@ -968,8 +970,8 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
     float reward = -1 * write_amp; 
     /* ========================= Training Part ======================= */
         
-    std::vector<int64_t> new_state;
-    new_state.reserve((cfd->NumberLevels()-1)*4096);
+    rocksdb_trainer_->new_state.clear();
+   // new_state.reserve((cfd->NumberLevels()-1)*4096);
     
     for(int i = 1; i < cfd->NumberLevels(); i++) {
       std::vector<FileMetaData*> files = vstorage->LevelFiles(i);
@@ -978,15 +980,20 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
       
       for(unsigned int j = 0; j < files.size(); j++) {        
         std::string small;
-        small.append("0");
-        small.append(files[j]->smallest.user_key().ToString(1).substr(0,2));
+        //small.append("0x0");
+        small.append(files[j]->smallest.user_key().ToString(1).substr(0,3));
         
         std::string large;
-        large.append("0");
-        large.append(files[j]->largest.user_key().ToString(1).substr(0,2));
+        //large.append("0x0");
+        large.append(files[j]->largest.user_key().ToString(1).substr(0,3));
         
         int64_t smallest_data = std::stol(small, NULL, 16);
         int64_t largest_data = std::stol(large, NULL, 16);
+//        std::cout << "small string " << files[j]->smallest.user_key().ToString(1) <<std::endl;
+//        std::cout << "large string " << files[j]->largest.user_key().ToString(1) <<std::endl;
+//        std::cout << "small : " << small << " Int : " << smallest_data <<std::endl;
+//        std::cout << "large : " << large << " Int : " << largest_data <<std::endl;
+//        std::cout << "num_entries : " << files[j]->num_entries<<std::endl;
         
         if(smallest_data == largest_data) {
           range_arr[largest_data] += files[j]->num_entries;
@@ -996,24 +1003,27 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
         }
       }
       
-      for(unsigned int k = 0; k < 4096; k++ ) 
-        new_state.push_back(range_arr[k]);
+      for(unsigned int k = 0; k < 4096; k++ ) {
+        rocksdb_trainer_->new_state.push_back(range_arr[k]);
+      }
           
       delete range_arr;     
-    }  
-       
+    }
+          
     torch::Tensor state_tensor = rocksdb_trainer_->state_tensor;
-    torch::Tensor new_state_tensor = rocksdb_trainer_->get_tensor_observation(new_state);
+   // std::cout <<"new state start !! " << std::endl;
+    torch::Tensor new_state_tensor = rocksdb_trainer_->get_tensor_observation(rocksdb_trainer_->new_state);
 
     torch::Tensor reward_tensor = torch::tensor(reward);
     //torch::Tensor done_tensor = torch::tensor(done); /* doen't require done */
     //done_tensor = done_tensor.to(torch::kFloat32);
     torch::Tensor action_tensor_new = torch::tensor(prev_act);
-
+   
     rocksdb_trainer_->buffer.push(state_tensor, new_state_tensor, action_tensor_new, reward_tensor);
 
-    if (rocksdb_trainer_->buffer.size_buffer() >= 64){
-      torch::Tensor loss = rocksdb_trainer_->compute_td_loss(rocksdb_trainer_->batch_size, rocksdb_trainer_->gamma);
+    if (rocksdb_trainer_->buffer.size_buffer() >= 64) {
+      torch::Tensor loss = rocksdb_trainer_->compute_td_loss();
+      std::cout << "[DQN policy LOSS] : " << loss << std::endl;
       //losses.push_back(loss);
     }
 
