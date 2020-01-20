@@ -1,6 +1,3 @@
-//
-// Created by Navneet Madhu Kumar on 2019-07-12.
-//
 #pragma once
 
 #include <torch/torch.h>
@@ -19,16 +16,16 @@ class Trainer {
     float gamma = 0.99;
     int64_t frame_id;
     int64_t previous_action;
-    std::vector<int64_t> state;
+    std::vector<float> state;
     torch::Tensor state_tensor;
-    std::vector<int64_t> new_state;
+    std::vector<float> new_state;
     //torch::Tensor new_state_tensor;
    
   
     Trainer(int64_t input_channels, int64_t num_actions, int64_t capacity, int64_t frame_id_, int64_t previous_action_);
     torch::Tensor compute_td_loss();
     double epsilon_by_frame();
-    torch::Tensor get_tensor_observation(std::vector<int64_t> &state);
+    torch::Tensor get_tensor_observation(std::vector<float> &state);
     void loadstatedict(torch::nn::Module& model,
                        torch::nn::Module& target_model);
 

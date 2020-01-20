@@ -1,6 +1,3 @@
-//
-// Created by Navneet Madhu Kumar on 2019-07-08.
-//
 #pragma once
 
 #include <torch/torch.h>

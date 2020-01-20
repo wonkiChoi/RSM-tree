@@ -1,6 +1,3 @@
-//
-// Created by Navneet Madhu Kumar on 2019-07-10.
-//
 #include "Trainer.h"
 #include "dqn.h"
 #include "ExperienceReplay.h"
@@ -72,7 +69,7 @@ Trainer::Trainer(int64_t input_channels, int64_t num_actions, int64_t capacity, 
         return epsilon_final + (epsilon_start - epsilon_final) * exp(-1. * frame_id / epsilon_decay);
     }
 
-    torch::Tensor Trainer::get_tensor_observation(std::vector<int64_t> &state) {
+    torch::Tensor Trainer::get_tensor_observation(std::vector<float> &state) {
         torch::Tensor state_tensor = torch::from_blob(state.data(), {1, 4, 4096});
         return state_tensor;
     }

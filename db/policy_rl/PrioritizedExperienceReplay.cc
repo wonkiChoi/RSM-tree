@@ -1,12 +1,3 @@
-//
-// Created by Navneet Madhu Kumar on 2019-07-18.
-//
-
-
-
-//
-// Created by Navneet Madhu Kumar on 2019-07-08.
-//
 #include "PrioritizedExperienceReplay.h"
 #include <memory>
 #include <vector>

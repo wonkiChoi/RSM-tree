@@ -58,6 +58,9 @@
 #include "util/stop_watch.h"
 #include "util/string_util.h"
 #include "db/policy_rl/Trainer.h"
+#include <gsl/gsl_statistics.h>
+#include <gsl/gsl_sort.h>
+#include <gsl/gsl_math.h>
 
 namespace rocksdb {
 
@@ -863,6 +866,33 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
   return status;
 }
 
+double CompactionJob::nrd0(double x[], const int N)
+{
+  gsl_sort(x, 1, N);
+  double hi = gsl_stats_sd(x, 1, N);
+  double iqr = gsl_stats_quantile_from_sorted_data (x,1, N,0.75) - gsl_stats_quantile_from_sorted_data (x,1, N,0.25);
+  double lo = GSL_MIN(hi, iqr/1.34);
+  double bw = 0.9 * lo * pow(N,-0.2);
+  return(bw);
+}
+
+double CompactionJob::gauss_kernel(double x)
+{ 
+  return exp(-(gsl_pow_2(x)/2))/(M_SQRT2*sqrt(M_PI)); 
+}
+
+double CompactionJob::kerneldensity(double *samples, double obs, size_t n)
+{
+  size_t i;
+  double h = GSL_MAX(nrd0(samples, n), 1e-6);
+  double prob = 0;
+  for(i = 0; i < n; i++)
+  {
+    prob += gauss_kernel((samples[i] - obs)/h);
+  }
+  return prob/(n*h);
+}
+
 Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::vector<float> &all_rewards) {
   AutoThreadOperationStageUpdater stage_updater(
       ThreadStatus::STAGE_COMPACTION_INSTALL);
@@ -878,27 +908,29 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
     rocksdb_trainer_->frame_id = compaction_id_;
     prev_act = rocksdb_trainer_->previous_action;
     auto ostorage = cfd->GetSuperVersion()->current->storage_info();
-    //rocksdb_trainer_->state.reserve((cfd->NumberLevels()-1) * 4096);
-
+//        InternalIterator* iter = cfd->table_cache()->NewIterator(
+//            ReadOptions(), env_options_, cfd->internal_comparator(),
+//            *files_meta[file_idx], /*range_del_agg=*/nullptr, /*prefix_extractor=*/nullptr,
+//            /*table_reader_ptr=*/nullptr,
+//            cfd->internal_stats()->GetFileReadHist(
+//                compact_->compaction->output_level()),
+//            TableReaderCaller::kCompactionRefill, /*arena=*/nullptr,
+//            /*skip_filters=*/false, compact_->compaction->output_level(),
+//            /*smallest_compaction_key=*/nullptr,
+//            /*largest_compaction_key=*/nullptr);
     for(int i = 1; i < cfd->NumberLevels(); i++) {
       std::vector<FileMetaData*> files = ostorage->LevelFiles(i);
-      int*  range_arr = new int[4096];
-      memset(range_arr, 0, 4096 * sizeof(int));
+      float*  range_arr = new float[4096];
+      memset(range_arr, 0, 4096 * sizeof(float));
 
       for(unsigned int j = 0; j < files.size(); j++) {       
-//        std::cout << "level : [" << i << " -- " << j << "]" << " smallest : "  << files[j]->smallest.user_key().ToString(1).substr(0,2) << std::endl;
-//        std::cout << "level : [" << i << " -- " << j << "]" << " largest : "  << files[j]->largest.user_key().ToString(1).substr(0,2) << std::endl;
         std::string small;
-        //small.append("0x0");
         small.append(files[j]->smallest.user_key().ToString(1).substr(0,3));
         
         std::string large;
-        //large.append("0x0");
         large.append(files[j]->largest.user_key().ToString(1).substr(0,3));
         int64_t smallest_data = std::stol(small, NULL, 16);
         int64_t largest_data = std::stol(large, NULL, 16);
-//        std::cout << "small Int : " << smallest_data  << std::endl
-//                << "largest Int : " << largest_data << std::endl;
         
         if(smallest_data == largest_data) {
           range_arr[largest_data] += files[j]->num_entries;
@@ -909,8 +941,7 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
       }
       
       for(unsigned int k = 0; k < 4096; k++ ) {
-        // std::cout << "input k [" << k << "] = " << range_arr[k] << std::endl;  
-        rocksdb_trainer_->state.push_back(range_arr[k]);
+        rocksdb_trainer_->state.push_back(static_cast<float>(range_arr[k]/8000));
       }
         
       delete range_arr;
@@ -975,8 +1006,8 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
     
     for(int i = 1; i < cfd->NumberLevels(); i++) {
       std::vector<FileMetaData*> files = vstorage->LevelFiles(i);
-      int* range_arr = new int[4096];
-      memset(range_arr, 0, 4096 * sizeof(int));  
+      float* range_arr = new float[4096];
+      memset(range_arr, 0, 4096 * sizeof(float));  
       
       for(unsigned int j = 0; j < files.size(); j++) {        
         std::string small;
@@ -1004,7 +1035,7 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
       }
       
       for(unsigned int k = 0; k < 4096; k++ ) {
-        rocksdb_trainer_->new_state.push_back(range_arr[k]);
+        rocksdb_trainer_->new_state.push_back(static_cast<float>(range_arr[k]/8000));
       }
           
       delete range_arr;     
