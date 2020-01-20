@@ -7,3 +7,5 @@ RocksDB is dual-licensed under both the GPLv2 (found in the COPYING file in the 
 ## Installation
 
 You need to install libtorch.so and you should make directory fo it
+
+required to install gsl library for kernel density estimation
