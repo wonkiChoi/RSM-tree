@@ -1,4 +1,4 @@
-## DQN-RocksDB: A Persistent Key-Value Store for Flash and RAM Storage with Reinforcement Learning
+## RSM-tree: A Persistent Key-Value Store for Flash and RAM Storage with Reinforcement Learning
 
 ## License
 
