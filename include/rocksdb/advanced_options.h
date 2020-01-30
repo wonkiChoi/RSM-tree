@@ -54,7 +54,7 @@ enum CompactionPri : char {
   // and its size is the smallest. It in many cases can optimize write
   // amplification.
   kMinOverlappingRatio = 0x3,
-  kDQNPolicy = 0x4,
+  kRSMPolicy = 0x4,
 };
 
 struct CompactionOptionsFIFO {
@@ -545,8 +545,8 @@ struct AdvancedColumnFamilyOptions {
   // If level compaction_style = kCompactionStyleLevel, for each level,
   // which files are prioritized to be picked to compact.
   // Default: kMinOverlappingRatio
-  //CompactionPri compaction_pri = kDQNPolicy;
-  CompactionPri compaction_pri = kMinOverlappingRatio;
+  CompactionPri compaction_pri = kRSMPolicy;
+  //CompactionPri compaction_pri = kMinOverlappingRatio;
 
   // The options needed to support Universal Style compactions
   //

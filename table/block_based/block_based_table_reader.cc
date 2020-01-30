@@ -14,6 +14,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <iostream>
 
 #include "db/dbformat.h"
 #include "db/pinned_iterators_manager.h"
@@ -3726,6 +3727,20 @@ Status BlockBasedTable::VerifyChecksum(const ReadOptions& read_options,
   }
   s = VerifyChecksumInBlocks(read_options, iiter);
   return s;
+}
+
+Status BlockBasedTable::GetIndice(std::vector<std::string> &indice) {
+  std::cout << "GetIndice() called" <<std::endl;
+  InternalIteratorBase<IndexValue>* iiter =
+      NewIndexIterator(ReadOptions(),
+                       /* disable_prefix_seek */ false, nullptr,
+                       /* index_entry */ nullptr, /* get_context */ nullptr);
+  
+  for (iiter->SeekToFirst(); iiter->Valid(); iiter->Next()) {
+    std::cout << "ITER KEY = " << iiter->user_key().ToString(1) << std::endl;
+  }
+  
+  return iiter->status();    
 }
 
 Status BlockBasedTable::VerifyChecksumInBlocks(

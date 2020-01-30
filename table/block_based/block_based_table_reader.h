@@ -192,6 +192,8 @@ class BlockBasedTable : public TableReader {
   Status VerifyChecksum(const ReadOptions& readOptions,
                         TableReaderCaller caller) override;
 
+  Status GetIndice(std::vector<std::string> &indice) override;
+  
   ~BlockBasedTable();
 
   bool TEST_FilterBlockInCache() const;

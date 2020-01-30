@@ -173,7 +173,7 @@ class TableCache {
                            const FileDescriptor& fd, TableReaderCaller caller,
                            const InternalKeyComparator& internal_comparator,
                            const SliceTransform* prefix_extractor = nullptr);
-
+  
   // Release the handle from a cache
   void ReleaseHandle(Cache::Handle* handle);
 

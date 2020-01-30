@@ -2713,7 +2713,7 @@ void VersionStorageInfo::UpdateFilesByCompactionPri(
         SortFileByOverlappingRatio(*internal_comparator_, files_[level],
                                    files_[level + 1], &temp);
         break;
-      case kDQNPolicy:
+      case kRSMPolicy:
         SortFileByOverlappingRatio(*internal_comparator_, files_[level],
                                    files_[level + 1], &temp);
         break;  
@@ -2755,7 +2755,7 @@ void VersionStorageInfo::UpdateFilesByCompactionPri(
     return;
   }
    
-  if (compaction_pri == kDQNPolicy) {
+  if (compaction_pri == kRSMPolicy) {
     double epsilon = rocksdb_trainer_->epsilon_by_frame();
     srand((unsigned int)time(NULL));
     auto r = ((double) rand() / (RAND_MAX));
@@ -2821,7 +2821,7 @@ void VersionStorageInfo::UpdateFilesByCompactionPri(
         SortFileByOverlappingRatio(*internal_comparator_, files_[level],
                                    files_[level + 1], &temp);
         break;
-      case kDQNPolicy:
+      case kRSMPolicy:
         SortFileByOverlappingRatio(*internal_comparator_, files_[level],
                                    files_[level + 1], &temp);
         break;

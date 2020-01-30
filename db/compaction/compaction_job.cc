@@ -881,6 +881,11 @@ double CompactionJob::gauss_kernel(double x)
   return exp(-(gsl_pow_2(x)/2))/(M_SQRT2*sqrt(M_PI)); 
 }
 
+double CompactionJob::gauss_cdf(double x)
+{ 
+  return exp(-(gsl_pow_2(x)/2))/(M_SQRT2*sqrt(M_PI)); 
+}
+
 double CompactionJob::kerneldensity(double *samples, double obs, size_t n)
 {
   size_t i;
@@ -888,9 +893,39 @@ double CompactionJob::kerneldensity(double *samples, double obs, size_t n)
   double prob = 0;
   for(i = 0; i < n; i++)
   {
-    prob += gauss_kernel((samples[i] - obs)/h);
+    prob += gauss_kernel((samples[i] - obs)/h)/(n*h);
   }
-  return prob/(n*h);
+  return prob;
+}
+
+double CompactionJob::kernel_cdf(double *samples, double obs, size_t n)
+{
+  size_t i;
+  double h = GSL_MAX(nrd0(samples, n), 1e-6);
+  double prob = 0;
+  for(i = 0; i < n; i++)
+  {
+    prob += gauss_cdf((samples[i] - obs)/h)/(n*h);
+  }
+  return prob;
+}
+
+double CompactionJob::HexToDouble(std::string &str)
+{
+  double hx;
+  int nn,r;
+  char * ch = (char*)str.c_str();
+ 
+  char * p,pp;
+  for (unsigned int i = 1; i <= str.length(); i++)
+  {
+    r = str.length() - i;
+    pp = ch[r];
+    nn = strtoul(&pp, &p, 16 );
+    hx = hx + nn * pow(16 , i-1);
+  }
+  
+  return hx;
 }
 
 Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::vector<float> &all_rewards) {
@@ -903,49 +938,39 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
       compact_->compaction->output_level(), thread_pri_, compaction_stats_);
   
   int64_t prev_act = 0;
+  auto prefix_extractor =
+    compact_->compaction->mutable_cf_options()->prefix_extractor.get();
   
-  if (compact_->compaction->immutable_cf_options()->compaction_pri == kDQNPolicy) {
+  if (compact_->compaction->immutable_cf_options()->compaction_pri == kRSMPolicy) {
     rocksdb_trainer_->frame_id = compaction_id_;
     prev_act = rocksdb_trainer_->previous_action;
+    
     auto ostorage = cfd->GetSuperVersion()->current->storage_info();
-//        InternalIterator* iter = cfd->table_cache()->NewIterator(
-//            ReadOptions(), env_options_, cfd->internal_comparator(),
-//            *files_meta[file_idx], /*range_del_agg=*/nullptr, /*prefix_extractor=*/nullptr,
-//            /*table_reader_ptr=*/nullptr,
-//            cfd->internal_stats()->GetFileReadHist(
-//                compact_->compaction->output_level()),
-//            TableReaderCaller::kCompactionRefill, /*arena=*/nullptr,
-//            /*skip_filters=*/false, compact_->compaction->output_level(),
-//            /*smallest_compaction_key=*/nullptr,
-//            /*largest_compaction_key=*/nullptr);
     for(int i = 1; i < cfd->NumberLevels(); i++) {
-      std::vector<FileMetaData*> files = ostorage->LevelFiles(i);
-      float*  range_arr = new float[4096];
-      memset(range_arr, 0, 4096 * sizeof(float));
+      std::vector<FileMetaData*> files = ostorage->LevelFiles(i);   
+      for(unsigned int j = 0; j < files.size(); j++) {
+        Status s;
+        TableReader* table_reader = nullptr;
+        Cache::Handle* handle = nullptr;
 
-      for(unsigned int j = 0; j < files.size(); j++) {       
-        std::string small;
-        small.append(files[j]->smallest.user_key().ToString(1).substr(0,3));
-        
-        std::string large;
-        large.append(files[j]->largest.user_key().ToString(1).substr(0,3));
-        int64_t smallest_data = std::stol(small, NULL, 16);
-        int64_t largest_data = std::stol(large, NULL, 16);
-        
-        if(smallest_data == largest_data) {
-          range_arr[largest_data] += files[j]->num_entries;
-        } else {
-          range_arr[smallest_data] += (files[j]->num_entries/2);
-          range_arr[largest_data] += (files[j]->num_entries/2);
+        auto& fd = files[j]->fd;
+        table_reader = fd.table_reader;
+        if (table_reader == nullptr) {
+          s = cfd->table_cache()->FindTable(env_options_, cfd->internal_comparator(), fd, &handle, prefix_extractor,
+                      false /* no_io */,
+                      true /* record_read_stats */, cfd->internal_stats()->GetFileReadHist(compact_->compaction->output_level()),
+                      false, compact_->compaction->output_level());
+          std::cout << "READER " << std::endl;
+          if (s.ok()) {
+            std::cout << "READER_GET " << std::endl;
+            table_reader = cfd->table_cache()->GetTableReaderFromHandle(handle);
+          }
         }
-      }
-      
-      for(unsigned int k = 0; k < 4096; k++ ) {
-        rocksdb_trainer_->state.push_back(static_cast<float>(range_arr[k]/8000));
-      }
         
-      delete range_arr;
-      
+        std::vector<std::string> temp;
+        std::cout << "ITER KEY START " << std::endl;
+        s  = table_reader->GetIndice(temp);    
+      }      
     }
   }
   
@@ -997,7 +1022,7 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
           .c_str());
   
   
-  if (compact_->compaction->immutable_cf_options()->compaction_pri == kDQNPolicy) {
+  if (compact_->compaction->immutable_cf_options()->compaction_pri == kRSMPolicy) {
     float reward = -1 * write_amp; 
     /* ========================= Training Part ======================= */
         
@@ -1006,48 +1031,40 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
     
     for(int i = 1; i < cfd->NumberLevels(); i++) {
       std::vector<FileMetaData*> files = vstorage->LevelFiles(i);
-      float* range_arr = new float[4096];
-      memset(range_arr, 0, 4096 * sizeof(float));  
+//      float* range_arr = new float[4096];
+//      memset(range_arr, 0, 4096 * sizeof(float));  
       
       for(unsigned int j = 0; j < files.size(); j++) {        
-        std::string small;
-        //small.append("0x0");
-        small.append(files[j]->smallest.user_key().ToString(1).substr(0,3));
-        
-        std::string large;
-        //large.append("0x0");
-        large.append(files[j]->largest.user_key().ToString(1).substr(0,3));
-        
-        int64_t smallest_data = std::stol(small, NULL, 16);
-        int64_t largest_data = std::stol(large, NULL, 16);
-//        std::cout << "small string " << files[j]->smallest.user_key().ToString(1) <<std::endl;
-//        std::cout << "large string " << files[j]->largest.user_key().ToString(1) <<std::endl;
-//        std::cout << "small : " << small << " Int : " << smallest_data <<std::endl;
-//        std::cout << "large : " << large << " Int : " << largest_data <<std::endl;
-//        std::cout << "num_entries : " << files[j]->num_entries<<std::endl;
-        
-        if(smallest_data == largest_data) {
-          range_arr[largest_data] += files[j]->num_entries;
-        } else {
-          range_arr[smallest_data] += (files[j]->num_entries/2);
-          range_arr[largest_data] += (files[j]->num_entries/2);
-        }
+//          std::cout << " Output : [level = " << i << "] num = " << j << " [" << files[j]->smallest.user_key().ToString(1) 
+//                  << " - " << files[j]->largest.user_key().ToString(1) << "] " << std::endl;
+//        std::string small;
+//        small.append(files[j]->smallest.user_key().ToString(1).substr(0,3));
+//        
+//        std::string large;
+//        large.append(files[j]->largest.user_key().ToString(1).substr(0,3));
+//        
+//        int64_t smallest_data = std::stol(small, NULL, 16);
+//        int64_t largest_data = std::stol(large, NULL, 16);
+//
+//        
+//        if(smallest_data == largest_data) {
+//          range_arr[largest_data] += files[j]->num_entries;
+//        } else {
+//          range_arr[smallest_data] += (files[j]->num_entries/2);
+//          range_arr[largest_data] += (files[j]->num_entries/2);
+//        }
       }
       
-      for(unsigned int k = 0; k < 4096; k++ ) {
-        rocksdb_trainer_->new_state.push_back(static_cast<float>(range_arr[k]/8000));
-      }
-          
-      delete range_arr;     
+//      for(unsigned int k = 0; k < 4096; k++ ) {
+//        rocksdb_trainer_->new_state.push_back(static_cast<float>(range_arr[k]/8000));
+//      }
+//          
+//      delete range_arr;     
     }
           
     torch::Tensor state_tensor = rocksdb_trainer_->state_tensor;
-   // std::cout <<"new state start !! " << std::endl;
     torch::Tensor new_state_tensor = rocksdb_trainer_->get_tensor_observation(rocksdb_trainer_->new_state);
-
     torch::Tensor reward_tensor = torch::tensor(reward);
-    //torch::Tensor done_tensor = torch::tensor(done); /* doen't require done */
-    //done_tensor = done_tensor.to(torch::kFloat32);
     torch::Tensor action_tensor_new = torch::tensor(prev_act);
    
     rocksdb_trainer_->buffer.push(state_tensor, new_state_tensor, action_tensor_new, reward_tensor);
@@ -1055,12 +1072,11 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
     if (rocksdb_trainer_->buffer.size_buffer() >= 64) {
       torch::Tensor loss = rocksdb_trainer_->compute_td_loss();
       std::cout << "[DQN policy LOSS] : " << loss << std::endl;
-      //losses.push_back(loss);
     }
 
     if (compaction_id_ % 10 == 0) {
-      std::cout<<"[DQN policy REWARD] : " << reward << std::endl;
       rocksdb_trainer_->loadstatedict(rocksdb_trainer_->network, rocksdb_trainer_->target_network);
+      std::cout<<"[DQN policy REWARD] : " << reward << std::endl;
     }
   }
   
