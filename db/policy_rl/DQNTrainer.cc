@@ -4,13 +4,11 @@
 #include <math.h>
 #include <chrono>
 
-void DQNTrainer::DQNTrainer(int64_t input_channels, int64_t num_actions, int64_t capacity):
+DQNTrainer::DQNTrainer(int64_t input_channels, int64_t num_actions, int64_t capacity):
   buffer(capacity),
   network(input_channels, num_actions),
   target_network(input_channels, num_actions),
-  dqn_optimizer(network.parameters(), torch::optim::AdamOptions(0.0001).beta1(0.5)),
-  frame_id(frame_id_),
-  previous_action(previous_action_){}
+  dqn_optimizer(network.parameters(), torch::optim::AdamOptions(0.0001).beta1(0.5)){}
 
 torch::Tensor DQNTrainer::compute_td_loss() {
   std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>> batch =

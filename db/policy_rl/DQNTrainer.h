@@ -5,7 +5,7 @@
 #include "dqn.h"
 #include "Trainer.h"
 
-class DQNTrainer : class Trainer {
+class DQNTrainer : public Trainer {
   public:
     ExperienceReplay buffer;
     DQN network, target_network;

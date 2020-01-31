@@ -13,7 +13,7 @@
 
 #include <torch/torch.h>
 
-class DDPGTrainer : class Trainer {
+class DDPGTrainer : public Trainer {
   public:
     double TAU = 1e-3;              // for soft update of target parameters
     double LR_ACTOR = 1e-4;         // learning rate of the actor
