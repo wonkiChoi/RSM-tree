@@ -1,32 +1,27 @@
-#pragma once
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
 
-#include <torch/torch.h>
-#include "ExperienceReplay.h"
-#include "dqn.h"
+/* 
+ * File:   Trainer.h
+ * Author: wonki
+ *
+ * Created on January 31, 2020, 4:58 PM
+ */
 
 class Trainer {
   public:
-    ExperienceReplay buffer;
-    DQN network, target_network;
-    torch::optim::Adam dqn_optimizer;
-    double epsilon_start = 0.7;
-    double epsilon_final = 0.01;
-    int64_t epsilon_decay = 30000;
     int64_t batch_size = 32;
     float gamma = 0.99;
-    int64_t frame_id;
-    int64_t previous_action;
-    std::vector<float> state;
-    torch::Tensor state_tensor;
-    std::vector<float> new_state;
-    //torch::Tensor new_state_tensor;
-   
+    int64_t frame_id = 0;
+    int64_t previous_action = 0;
+    int64_t input_channels;
+    int64_t num_actions;
+    std::vector<float> PrevState;
+    torch::Tensor PrevStateTensor;
+    std::vector<float> NewState; 
   
-    Trainer(int64_t input_channels, int64_t num_actions, int64_t capacity, int64_t frame_id_, int64_t previous_action_);
-    torch::Tensor compute_td_loss();
-    double epsilon_by_frame();
-    torch::Tensor get_tensor_observation(std::vector<float> &state);
-    void loadstatedict(torch::nn::Module& model,
-                       torch::nn::Module& target_model);
-
+    Trainer(int64_t input_channels, int64_t num_actions, int64_t capacity) = 0;
 };

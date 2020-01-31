@@ -47,7 +47,7 @@
 #include "table/get_context.h"
 #include "table/multiget_context.h"
 #include "trace_replay/block_cache_tracer.h"
-#include "db/policy_rl/Trainer.h"
+#include "db/policy_rl/DQNTrainer.h"
 
 namespace rocksdb {
 

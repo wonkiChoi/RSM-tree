@@ -57,7 +57,7 @@
 #include "util/random.h"
 #include "util/stop_watch.h"
 #include "util/string_util.h"
-#include "db/policy_rl/Trainer.h"
+#include "db/policy_rl/DQNTrainer.h"
 #include <gsl/gsl_statistics.h>
 #include <gsl/gsl_sort.h>
 #include <gsl/gsl_math.h>
@@ -951,8 +951,7 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
       for(uint k = 0; k < indice.size(); k++) {
         std::cout << "double indice = " << indice[k] << std::endl;
       }
-      std::cout << " KernelCDf = " << KernelCdf(indice.data(), 1, indice.size()) <<std::endl;
-      
+      std::cout << " KernelCDf = " << KernelCdf(indice.data(), 1, indice.size()) <<std::endl;  
       
     }
   }

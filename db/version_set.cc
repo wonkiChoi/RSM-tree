@@ -53,7 +53,7 @@
 #include "util/stop_watch.h"
 #include "util/string_util.h"
 #include "util/user_comparator_wrapper.h"
-#include "db/policy_rl/Trainer.h"
+#include "db/policy_rl/DQNTrainer.h"
 
 namespace rocksdb {
 
