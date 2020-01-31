@@ -192,7 +192,9 @@ class BlockBasedTable : public TableReader {
   Status VerifyChecksum(const ReadOptions& readOptions,
                         TableReaderCaller caller) override;
 
-  Status GetIndice(std::vector<std::string> &indice) override;
+  double HexToDouble(std::string &str);
+  
+  Status GetIndice(std::vector<double> &indice) override;
   
   ~BlockBasedTable();
 

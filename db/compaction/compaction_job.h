@@ -155,11 +155,10 @@ class CompactionJob {
   void LogCompaction();
   
   double nrd0(double x[], const int N);
-  double gauss_kernel(double x);
-  double gauss_cdf(double x);
-  double kerneldensity(double *samples, double obs, size_t n);
-  double kernel_cdf(double *samples, double obs, size_t n);
-  double HexToDouble(std::string &str);
+  double GaussKernel(double x);
+  double GaussCdf(double x);
+  double KernelDensity(double *samples, double obs, size_t n);
+  double KernelCdf(double *samples, double obs, size_t n);
   
   int job_id_;
   int compaction_id_;

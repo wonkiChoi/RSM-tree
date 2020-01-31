@@ -54,6 +54,10 @@
 #include "util/stop_watch.h"
 #include "util/string_util.h"
 #include "util/xxhash.h"
+#include <gsl/gsl_statistics.h>
+#include <gsl/gsl_sort.h>
+#include <gsl/gsl_math.h>
+#include <gsl/gsl_cdf.h>
 
 namespace rocksdb {
 
@@ -3729,17 +3733,47 @@ Status BlockBasedTable::VerifyChecksum(const ReadOptions& read_options,
   return s;
 }
 
-Status BlockBasedTable::GetIndice(std::vector<std::string> &indice) {
+  double BlockBasedTable::HexToDouble(std::string &str)
+  {
+    double hx;
+    int nn,r;
+    char *p,pp;
+    for (unsigned int i = 1; i <= str.length(); i++)
+    {
+      r = str.length() - i;
+      pp = str.at(r);
+      nn = strtoul(&pp, &p, 16 );
+      hx = hx + nn * pow(16 , i-1);
+    }
+  
+    return hx;
+  }
+
+Status BlockBasedTable::GetIndice(std::vector<double> &indice) {
   std::cout << "GetIndice() called" <<std::endl;
   InternalIteratorBase<IndexValue>* iiter =
       NewIndexIterator(ReadOptions(),
                        /* disable_prefix_seek */ false, nullptr,
                        /* index_entry */ nullptr, /* get_context */ nullptr);
+
+  int i = 0;
+  unsigned int len = 0;
   
   for (iiter->SeekToFirst(); iiter->Valid(); iiter->Next()) {
-    std::cout << "ITER KEY = " << iiter->user_key().ToString(1) << std::endl;
+      if (i == 0) len = iiter->user_key().size();
+      if (iiter->user_key().size() < len) {
+        iiter->Next();
+      }
+      
+      if (i % 1000 == 0) {
+        std::string hexKey;
+        hexKey.append(iiter->user_key().ToString(1));
+        indice.push_back(HexToDouble(hexKey));
+      }
+      i++;
   }
-  
+  //double cdfEst = KernelCdf(dbVect.data() , 1, dbVect.size());
+   
   return iiter->status();    
 }
 

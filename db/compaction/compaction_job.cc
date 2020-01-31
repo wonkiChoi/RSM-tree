@@ -61,6 +61,7 @@
 #include <gsl/gsl_statistics.h>
 #include <gsl/gsl_sort.h>
 #include <gsl/gsl_math.h>
+#include <gsl/gsl_cdf.h>
 
 namespace rocksdb {
 
@@ -866,8 +867,7 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
   return status;
 }
 
-double CompactionJob::nrd0(double x[], const int N)
-{
+double CompactionJob::nrd0(double x[], const int N) {
   gsl_sort(x, 1, N);
   double hi = gsl_stats_sd(x, 1, N);
   double iqr = gsl_stats_quantile_from_sorted_data (x,1, N,0.75) - gsl_stats_quantile_from_sorted_data (x,1, N,0.25);
@@ -876,56 +876,34 @@ double CompactionJob::nrd0(double x[], const int N)
   return(bw);
 }
 
-double CompactionJob::gauss_kernel(double x)
-{ 
+double CompactionJob::GaussKernel(double x) { 
   return exp(-(gsl_pow_2(x)/2))/(M_SQRT2*sqrt(M_PI)); 
 }
 
-double CompactionJob::gauss_cdf(double x)
-{ 
-  return exp(-(gsl_pow_2(x)/2))/(M_SQRT2*sqrt(M_PI)); 
+double CompactionJob::GaussCdf(double x) { 
+  return gsl_cdf_ugaussian_P(x); 
 }
 
-double CompactionJob::kerneldensity(double *samples, double obs, size_t n)
-{
+double CompactionJob::KernelDensity(double *samples, double obs, size_t n) {
   size_t i;
   double h = GSL_MAX(nrd0(samples, n), 1e-6);
   double prob = 0;
   for(i = 0; i < n; i++)
   {
-    prob += gauss_kernel((samples[i] - obs)/h)/(n*h);
+    prob += GaussKernel((samples[i] - obs)/h)/(n*h);
   }
   return prob;
 }
 
-double CompactionJob::kernel_cdf(double *samples, double obs, size_t n)
-{
+double CompactionJob::KernelCdf(double *samples, double obs, size_t n) {
   size_t i;
   double h = GSL_MAX(nrd0(samples, n), 1e-6);
   double prob = 0;
   for(i = 0; i < n; i++)
   {
-    prob += gauss_cdf((samples[i] - obs)/h)/(n*h);
+    prob += GaussCdf((samples[i] - obs)/h)/(n*h);
   }
   return prob;
-}
-
-double CompactionJob::HexToDouble(std::string &str)
-{
-  double hx;
-  int nn,r;
-  char * ch = (char*)str.c_str();
- 
-  char * p,pp;
-  for (unsigned int i = 1; i <= str.length(); i++)
-  {
-    r = str.length() - i;
-    pp = ch[r];
-    nn = strtoul(&pp, &p, 16 );
-    hx = hx + nn * pow(16 , i-1);
-  }
-  
-  return hx;
 }
 
 Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::vector<float> &all_rewards) {
@@ -947,7 +925,8 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
     
     auto ostorage = cfd->GetSuperVersion()->current->storage_info();
     for(int i = 1; i < cfd->NumberLevels(); i++) {
-      std::vector<FileMetaData*> files = ostorage->LevelFiles(i);   
+      std::vector<FileMetaData*> files = ostorage->LevelFiles(i);
+      std::vector<double> indice;
       for(unsigned int j = 0; j < files.size(); j++) {
         Status s;
         TableReader* table_reader = nullptr;
@@ -960,17 +939,21 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
                       false /* no_io */,
                       true /* record_read_stats */, cfd->internal_stats()->GetFileReadHist(compact_->compaction->output_level()),
                       false, compact_->compaction->output_level());
-          std::cout << "READER " << std::endl;
           if (s.ok()) {
-            std::cout << "READER_GET " << std::endl;
             table_reader = cfd->table_cache()->GetTableReaderFromHandle(handle);
           }
         }
-        
-        std::vector<std::string> temp;
-        std::cout << "ITER KEY START " << std::endl;
-        s  = table_reader->GetIndice(temp);    
-      }      
+        s  = table_reader->GetIndice(indice);    
+      }
+      
+      std::cout << "indice size = " << indice.size() << std::endl;
+      
+      for(uint k = 0; k < indice.size(); k++) {
+        std::cout << "double indice = " << indice[k] << std::endl;
+      }
+      std::cout << " KernelCDf = " << KernelCdf(indice.data(), 1, indice.size()) <<std::endl;
+      
+      
     }
   }
   
