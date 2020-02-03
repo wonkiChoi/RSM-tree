@@ -2,7 +2,7 @@
 
 #include <torch/torch.h>
 #include "ExperienceReplay.h"
-#include "dqn.h"
+#include "DQN.h"
 #include "Trainer.h"
 
 class DQNTrainer : public Trainer {

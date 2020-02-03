@@ -704,10 +704,9 @@ set(SOURCES
         utilities/ttl/db_ttl_impl.cc
         utilities/write_batch_with_index/write_batch_with_index.cc
         utilities/write_batch_with_index/write_batch_with_index_internal.cc
-        db/policy_rl/dqn.cc
+        db/policy_rl/DDPGTrainer.cc
+        db/policy_rl/DQNTrainer.cc
         db/policy_rl/ExperienceReplay.cc
-        db/policy_rl/PrioritizedExperienceReplay.cc
-        db/policy_rl/Trainer.cc
         $<TARGET_OBJECTS:build_version>)
 
 if(HAVE_SSE42 AND NOT MSVC)

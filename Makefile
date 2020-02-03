@@ -5459,6 +5459,66 @@ db/plain_table_db_test.cc.s:
 	$(MAKE) -f CMakeFiles/rocksdb_plain_table_db_test.dir/build.make CMakeFiles/rocksdb_plain_table_db_test.dir/db/plain_table_db_test.cc.s
 .PHONY : db/plain_table_db_test.cc.s
 
+db/policy_rl/DDPGTrainer.o: db/policy_rl/DDPGTrainer.cc.o
+
+.PHONY : db/policy_rl/DDPGTrainer.o
+
+# target to build an object file
+db/policy_rl/DDPGTrainer.cc.o:
+	$(MAKE) -f CMakeFiles/rocksdb.dir/build.make CMakeFiles/rocksdb.dir/db/policy_rl/DDPGTrainer.cc.o
+	$(MAKE) -f CMakeFiles/rocksdb-shared.dir/build.make CMakeFiles/rocksdb-shared.dir/db/policy_rl/DDPGTrainer.cc.o
+.PHONY : db/policy_rl/DDPGTrainer.cc.o
+
+db/policy_rl/DDPGTrainer.i: db/policy_rl/DDPGTrainer.cc.i
+
+.PHONY : db/policy_rl/DDPGTrainer.i
+
+# target to preprocess a source file
+db/policy_rl/DDPGTrainer.cc.i:
+	$(MAKE) -f CMakeFiles/rocksdb.dir/build.make CMakeFiles/rocksdb.dir/db/policy_rl/DDPGTrainer.cc.i
+	$(MAKE) -f CMakeFiles/rocksdb-shared.dir/build.make CMakeFiles/rocksdb-shared.dir/db/policy_rl/DDPGTrainer.cc.i
+.PHONY : db/policy_rl/DDPGTrainer.cc.i
+
+db/policy_rl/DDPGTrainer.s: db/policy_rl/DDPGTrainer.cc.s
+
+.PHONY : db/policy_rl/DDPGTrainer.s
+
+# target to generate assembly for a file
+db/policy_rl/DDPGTrainer.cc.s:
+	$(MAKE) -f CMakeFiles/rocksdb.dir/build.make CMakeFiles/rocksdb.dir/db/policy_rl/DDPGTrainer.cc.s
+	$(MAKE) -f CMakeFiles/rocksdb-shared.dir/build.make CMakeFiles/rocksdb-shared.dir/db/policy_rl/DDPGTrainer.cc.s
+.PHONY : db/policy_rl/DDPGTrainer.cc.s
+
+db/policy_rl/DQNTrainer.o: db/policy_rl/DQNTrainer.cc.o
+
+.PHONY : db/policy_rl/DQNTrainer.o
+
+# target to build an object file
+db/policy_rl/DQNTrainer.cc.o:
+	$(MAKE) -f CMakeFiles/rocksdb.dir/build.make CMakeFiles/rocksdb.dir/db/policy_rl/DQNTrainer.cc.o
+	$(MAKE) -f CMakeFiles/rocksdb-shared.dir/build.make CMakeFiles/rocksdb-shared.dir/db/policy_rl/DQNTrainer.cc.o
+.PHONY : db/policy_rl/DQNTrainer.cc.o
+
+db/policy_rl/DQNTrainer.i: db/policy_rl/DQNTrainer.cc.i
+
+.PHONY : db/policy_rl/DQNTrainer.i
+
+# target to preprocess a source file
+db/policy_rl/DQNTrainer.cc.i:
+	$(MAKE) -f CMakeFiles/rocksdb.dir/build.make CMakeFiles/rocksdb.dir/db/policy_rl/DQNTrainer.cc.i
+	$(MAKE) -f CMakeFiles/rocksdb-shared.dir/build.make CMakeFiles/rocksdb-shared.dir/db/policy_rl/DQNTrainer.cc.i
+.PHONY : db/policy_rl/DQNTrainer.cc.i
+
+db/policy_rl/DQNTrainer.s: db/policy_rl/DQNTrainer.cc.s
+
+.PHONY : db/policy_rl/DQNTrainer.s
+
+# target to generate assembly for a file
+db/policy_rl/DQNTrainer.cc.s:
+	$(MAKE) -f CMakeFiles/rocksdb.dir/build.make CMakeFiles/rocksdb.dir/db/policy_rl/DQNTrainer.cc.s
+	$(MAKE) -f CMakeFiles/rocksdb-shared.dir/build.make CMakeFiles/rocksdb-shared.dir/db/policy_rl/DQNTrainer.cc.s
+.PHONY : db/policy_rl/DQNTrainer.cc.s
+
 db/policy_rl/ExperienceReplay.o: db/policy_rl/ExperienceReplay.cc.o
 
 .PHONY : db/policy_rl/ExperienceReplay.o
@@ -5488,96 +5548,6 @@ db/policy_rl/ExperienceReplay.cc.s:
 	$(MAKE) -f CMakeFiles/rocksdb.dir/build.make CMakeFiles/rocksdb.dir/db/policy_rl/ExperienceReplay.cc.s
 	$(MAKE) -f CMakeFiles/rocksdb-shared.dir/build.make CMakeFiles/rocksdb-shared.dir/db/policy_rl/ExperienceReplay.cc.s
 .PHONY : db/policy_rl/ExperienceReplay.cc.s
-
-db/policy_rl/PrioritizedExperienceReplay.o: db/policy_rl/PrioritizedExperienceReplay.cc.o
-
-.PHONY : db/policy_rl/PrioritizedExperienceReplay.o
-
-# target to build an object file
-db/policy_rl/PrioritizedExperienceReplay.cc.o:
-	$(MAKE) -f CMakeFiles/rocksdb.dir/build.make CMakeFiles/rocksdb.dir/db/policy_rl/PrioritizedExperienceReplay.cc.o
-	$(MAKE) -f CMakeFiles/rocksdb-shared.dir/build.make CMakeFiles/rocksdb-shared.dir/db/policy_rl/PrioritizedExperienceReplay.cc.o
-.PHONY : db/policy_rl/PrioritizedExperienceReplay.cc.o
-
-db/policy_rl/PrioritizedExperienceReplay.i: db/policy_rl/PrioritizedExperienceReplay.cc.i
-
-.PHONY : db/policy_rl/PrioritizedExperienceReplay.i
-
-# target to preprocess a source file
-db/policy_rl/PrioritizedExperienceReplay.cc.i:
-	$(MAKE) -f CMakeFiles/rocksdb.dir/build.make CMakeFiles/rocksdb.dir/db/policy_rl/PrioritizedExperienceReplay.cc.i
-	$(MAKE) -f CMakeFiles/rocksdb-shared.dir/build.make CMakeFiles/rocksdb-shared.dir/db/policy_rl/PrioritizedExperienceReplay.cc.i
-.PHONY : db/policy_rl/PrioritizedExperienceReplay.cc.i
-
-db/policy_rl/PrioritizedExperienceReplay.s: db/policy_rl/PrioritizedExperienceReplay.cc.s
-
-.PHONY : db/policy_rl/PrioritizedExperienceReplay.s
-
-# target to generate assembly for a file
-db/policy_rl/PrioritizedExperienceReplay.cc.s:
-	$(MAKE) -f CMakeFiles/rocksdb.dir/build.make CMakeFiles/rocksdb.dir/db/policy_rl/PrioritizedExperienceReplay.cc.s
-	$(MAKE) -f CMakeFiles/rocksdb-shared.dir/build.make CMakeFiles/rocksdb-shared.dir/db/policy_rl/PrioritizedExperienceReplay.cc.s
-.PHONY : db/policy_rl/PrioritizedExperienceReplay.cc.s
-
-db/policy_rl/Trainer.o: db/policy_rl/Trainer.cc.o
-
-.PHONY : db/policy_rl/Trainer.o
-
-# target to build an object file
-db/policy_rl/Trainer.cc.o:
-	$(MAKE) -f CMakeFiles/rocksdb.dir/build.make CMakeFiles/rocksdb.dir/db/policy_rl/Trainer.cc.o
-	$(MAKE) -f CMakeFiles/rocksdb-shared.dir/build.make CMakeFiles/rocksdb-shared.dir/db/policy_rl/Trainer.cc.o
-.PHONY : db/policy_rl/Trainer.cc.o
-
-db/policy_rl/Trainer.i: db/policy_rl/Trainer.cc.i
-
-.PHONY : db/policy_rl/Trainer.i
-
-# target to preprocess a source file
-db/policy_rl/Trainer.cc.i:
-	$(MAKE) -f CMakeFiles/rocksdb.dir/build.make CMakeFiles/rocksdb.dir/db/policy_rl/Trainer.cc.i
-	$(MAKE) -f CMakeFiles/rocksdb-shared.dir/build.make CMakeFiles/rocksdb-shared.dir/db/policy_rl/Trainer.cc.i
-.PHONY : db/policy_rl/Trainer.cc.i
-
-db/policy_rl/Trainer.s: db/policy_rl/Trainer.cc.s
-
-.PHONY : db/policy_rl/Trainer.s
-
-# target to generate assembly for a file
-db/policy_rl/Trainer.cc.s:
-	$(MAKE) -f CMakeFiles/rocksdb.dir/build.make CMakeFiles/rocksdb.dir/db/policy_rl/Trainer.cc.s
-	$(MAKE) -f CMakeFiles/rocksdb-shared.dir/build.make CMakeFiles/rocksdb-shared.dir/db/policy_rl/Trainer.cc.s
-.PHONY : db/policy_rl/Trainer.cc.s
-
-db/policy_rl/dqn.o: db/policy_rl/dqn.cc.o
-
-.PHONY : db/policy_rl/dqn.o
-
-# target to build an object file
-db/policy_rl/dqn.cc.o:
-	$(MAKE) -f CMakeFiles/rocksdb.dir/build.make CMakeFiles/rocksdb.dir/db/policy_rl/dqn.cc.o
-	$(MAKE) -f CMakeFiles/rocksdb-shared.dir/build.make CMakeFiles/rocksdb-shared.dir/db/policy_rl/dqn.cc.o
-.PHONY : db/policy_rl/dqn.cc.o
-
-db/policy_rl/dqn.i: db/policy_rl/dqn.cc.i
-
-.PHONY : db/policy_rl/dqn.i
-
-# target to preprocess a source file
-db/policy_rl/dqn.cc.i:
-	$(MAKE) -f CMakeFiles/rocksdb.dir/build.make CMakeFiles/rocksdb.dir/db/policy_rl/dqn.cc.i
-	$(MAKE) -f CMakeFiles/rocksdb-shared.dir/build.make CMakeFiles/rocksdb-shared.dir/db/policy_rl/dqn.cc.i
-.PHONY : db/policy_rl/dqn.cc.i
-
-db/policy_rl/dqn.s: db/policy_rl/dqn.cc.s
-
-.PHONY : db/policy_rl/dqn.s
-
-# target to generate assembly for a file
-db/policy_rl/dqn.cc.s:
-	$(MAKE) -f CMakeFiles/rocksdb.dir/build.make CMakeFiles/rocksdb.dir/db/policy_rl/dqn.cc.s
-	$(MAKE) -f CMakeFiles/rocksdb-shared.dir/build.make CMakeFiles/rocksdb-shared.dir/db/policy_rl/dqn.cc.s
-.PHONY : db/policy_rl/dqn.cc.s
 
 db/prefix_test.o: db/prefix_test.cc.o
 
@@ -14298,18 +14268,15 @@ help:
 	@echo "... db/plain_table_db_test.o"
 	@echo "... db/plain_table_db_test.i"
 	@echo "... db/plain_table_db_test.s"
+	@echo "... db/policy_rl/DDPGTrainer.o"
+	@echo "... db/policy_rl/DDPGTrainer.i"
+	@echo "... db/policy_rl/DDPGTrainer.s"
+	@echo "... db/policy_rl/DQNTrainer.o"
+	@echo "... db/policy_rl/DQNTrainer.i"
+	@echo "... db/policy_rl/DQNTrainer.s"
 	@echo "... db/policy_rl/ExperienceReplay.o"
 	@echo "... db/policy_rl/ExperienceReplay.i"
 	@echo "... db/policy_rl/ExperienceReplay.s"
-	@echo "... db/policy_rl/PrioritizedExperienceReplay.o"
-	@echo "... db/policy_rl/PrioritizedExperienceReplay.i"
-	@echo "... db/policy_rl/PrioritizedExperienceReplay.s"
-	@echo "... db/policy_rl/Trainer.o"
-	@echo "... db/policy_rl/Trainer.i"
-	@echo "... db/policy_rl/Trainer.s"
-	@echo "... db/policy_rl/dqn.o"
-	@echo "... db/policy_rl/dqn.i"
-	@echo "... db/policy_rl/dqn.s"
 	@echo "... db/prefix_test.o"
 	@echo "... db/prefix_test.i"
 	@echo "... db/prefix_test.s"

@@ -17,11 +17,9 @@ class Trainer {
     float gamma = 0.99;
     int64_t frame_id = 0;
     int64_t previous_action = 0;
-    int64_t input_channels;
-    int64_t num_actions;
     std::vector<float> PrevState;
     torch::Tensor PrevStateTensor;
     std::vector<float> NewState; 
   
-    Trainer(int64_t input_channels, int64_t num_actions, int64_t capacity) = 0;
+    Trainer(int64_t input_channels, int64_t num_actions, int64_t capacity);
 };

@@ -1,5 +1,5 @@
 #include "DQNTrainer.h"
-#include "dqn.h"
+#include "DQN.h"
 #include "ExperienceReplay.h"
 #include <math.h>
 #include <chrono>
