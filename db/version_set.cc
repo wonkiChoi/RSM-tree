@@ -53,7 +53,6 @@
 #include "util/stop_watch.h"
 #include "util/string_util.h"
 #include "util/user_comparator_wrapper.h"
-#include "db/policy_rl/DQNTrainer.h"
 
 namespace rocksdb {
 
@@ -2755,29 +2754,6 @@ void VersionStorageInfo::UpdateFilesByCompactionPri(
     return;
   }
    
-  if (compaction_pri == kRSMPolicy) {
-    double epsilon = rocksdb_trainer_->epsilon_by_frame();
-    srand((unsigned int)time(NULL));
-    auto r = ((double) rand() / (RAND_MAX));
-    torch::Tensor state_tensor = rocksdb_trainer_->get_tensor_observation(rocksdb_trainer_->state);
-    rocksdb_trainer_->state.clear();
-    rocksdb_trainer_->state_tensor = state_tensor;   
-    int64_t index = 0;
-    std::cout << "frame_id : " << rocksdb_trainer_->frame_id <<  " r : " << r  << " epsilon : " << epsilon <<std::endl; 
-    if (r <= epsilon){
-      index = rand() % 4;
-      std::cout << "[random] index : " << index << std::endl;
-      compaction_pri = retCompactionPri(index);
-      rocksdb_trainer_->previous_action = index;
-    } else {
-      torch::Tensor action_tensor = rocksdb_trainer_->network.act(state_tensor);
-      index = action_tensor[0].item<int64_t>();
-      std::cout << "[Q-value] index : " << index << std::endl;
-      compaction_pri = retCompactionPri(index);
-      rocksdb_trainer_->previous_action = index;
-    }
-  }
-  
   // No need to sort the highest level because it is never compacted.
   for (int level = 0; level < num_levels() - 1; level++) {
     const std::vector<FileMetaData*>& files = files_[level];
@@ -2822,8 +2798,10 @@ void VersionStorageInfo::UpdateFilesByCompactionPri(
                                    files_[level + 1], &temp);
         break;
       case kRSMPolicy:
-        SortFileByOverlappingRatio(*internal_comparator_, files_[level],
-                                   files_[level + 1], &temp);
+      {
+        rocksdb_trainer_->PreviousAction = rocksdb_trainer_->act(rocksdb_trainer_->PrevState);
+        rocksdb_trainer_->PrevState.clear();
+      }
         break;
       default:
         assert(false);

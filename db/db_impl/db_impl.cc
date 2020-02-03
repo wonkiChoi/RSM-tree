@@ -230,7 +230,7 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
       closed_(false),
       error_handler_(this, immutable_db_options_, &mutex_),
       atomic_flush_install_cv_(&mutex_),
-      rocksdb_trainer(DDPGTrainer(4096,4,64,0,0)) {
+      rocksdb_trainer(DDPGTrainer(4096,4,64)) {
   // !batch_per_trx_ implies seq_per_batch_ because it is only unset for
   // WriteUnprepared, which should use seq_per_batch_.
   assert(batch_per_txn_ || seq_per_batch_);

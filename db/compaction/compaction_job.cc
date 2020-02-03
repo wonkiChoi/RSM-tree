@@ -57,7 +57,6 @@
 #include "util/random.h"
 #include "util/stop_watch.h"
 #include "util/string_util.h"
-#include "db/policy_rl/DQNTrainer.h"
 #include <gsl/gsl_statistics.h>
 #include <gsl/gsl_sort.h>
 #include <gsl/gsl_math.h>
@@ -915,13 +914,13 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
   cfd->internal_stats()->AddCompactionStats(
       compact_->compaction->output_level(), thread_pri_, compaction_stats_);
   
-  int64_t prev_act = 0;
+  std::vector<float> prev_act;
   auto prefix_extractor =
     compact_->compaction->mutable_cf_options()->prefix_extractor.get();
   
   if (compact_->compaction->immutable_cf_options()->compaction_pri == kRSMPolicy) {
     rocksdb_trainer_->frame_id = compaction_id_;
-    prev_act = rocksdb_trainer_->previous_action;
+    prev_act = rocksdb_trainer_->PreviousAction;
     
     auto ostorage = cfd->GetSuperVersion()->current->storage_info();
     for(int i = 1; i < cfd->NumberLevels(); i++) {
@@ -1008,56 +1007,50 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
     float reward = -1 * write_amp; 
     /* ========================= Training Part ======================= */
         
-    rocksdb_trainer_->new_state.clear();
-   // new_state.reserve((cfd->NumberLevels()-1)*4096);
+    rocksdb_trainer_->NewState.clear();
     
     for(int i = 1; i < cfd->NumberLevels(); i++) {
       std::vector<FileMetaData*> files = vstorage->LevelFiles(i);
-//      float* range_arr = new float[4096];
-//      memset(range_arr, 0, 4096 * sizeof(float));  
-      
-      for(unsigned int j = 0; j < files.size(); j++) {        
-//          std::cout << " Output : [level = " << i << "] num = " << j << " [" << files[j]->smallest.user_key().ToString(1) 
-//                  << " - " << files[j]->largest.user_key().ToString(1) << "] " << std::endl;
-//        std::string small;
-//        small.append(files[j]->smallest.user_key().ToString(1).substr(0,3));
-//        
-//        std::string large;
-//        large.append(files[j]->largest.user_key().ToString(1).substr(0,3));
-//        
-//        int64_t smallest_data = std::stol(small, NULL, 16);
-//        int64_t largest_data = std::stol(large, NULL, 16);
-//
-//        
-//        if(smallest_data == largest_data) {
-//          range_arr[largest_data] += files[j]->num_entries;
-//        } else {
-//          range_arr[smallest_data] += (files[j]->num_entries/2);
-//          range_arr[largest_data] += (files[j]->num_entries/2);
-//        }
+      std::vector<double> indice;
+      for(unsigned int j = 0; j < files.size(); j++) {
+        Status s;
+        TableReader* table_reader = nullptr;
+        Cache::Handle* handle = nullptr;
+
+        auto& fd = files[j]->fd;
+        table_reader = fd.table_reader;
+        if (table_reader == nullptr) {
+          s = cfd->table_cache()->FindTable(env_options_, cfd->internal_comparator(), fd, &handle, prefix_extractor,
+                      false /* no_io */,
+                      true /* record_read_stats */, cfd->internal_stats()->GetFileReadHist(compact_->compaction->output_level()),
+                      false, compact_->compaction->output_level());
+          if (s.ok()) {
+            table_reader = cfd->table_cache()->GetTableReaderFromHandle(handle);
+          }
+        }
+        s  = table_reader->GetIndice(indice);    
       }
       
-//      for(unsigned int k = 0; k < 4096; k++ ) {
-//        rocksdb_trainer_->new_state.push_back(static_cast<float>(range_arr[k]/8000));
-//      }
-//          
-//      delete range_arr;     
+      std::cout << "indice size = " << indice.size() << std::endl;
+      
+      for(uint k = 0; k < indice.size(); k++) {
+        std::cout << "double indice = " << indice[k] << std::endl;
+      }
+      std::cout << " KernelCDf = " << KernelCdf(indice.data(), 1, indice.size()) <<std::endl;       
     }
-          
-    torch::Tensor state_tensor = rocksdb_trainer_->state_tensor;
-    torch::Tensor new_state_tensor = rocksdb_trainer_->get_tensor_observation(rocksdb_trainer_->new_state);
-    torch::Tensor reward_tensor = torch::tensor(reward);
-    torch::Tensor action_tensor_new = torch::tensor(prev_act);
-   
-    rocksdb_trainer_->buffer.push(state_tensor, new_state_tensor, action_tensor_new, reward_tensor);
+    
+    torch::Tensor state_tensor = torch::tensor(rocksdb_trainer_->PrevState, torch::dtype(torch::kFloat));
+    torch::Tensor new_state_tensor = torch::tensor(rocksdb_trainer_->NewState, torch::dtype(torch::kFloat));
+    torch::Tensor action_tensor = torch::tensor(rocksdb_trainer_->PreviousAction, torch::dtype(torch::kFloat));
+    torch::Tensor reward_tensor = torch::tensor(reward, torch::dtype(torch::kFloat));
+      
+    rocksdb_trainer_->buffer.push(state_tensor, new_state_tensor, action_tensor, reward_tensor);
 
     if (rocksdb_trainer_->buffer.size_buffer() >= 64) {
-      torch::Tensor loss = rocksdb_trainer_->compute_td_loss();
-      std::cout << "[DQN policy LOSS] : " << loss << std::endl;
+      rocksdb_trainer_->learn();
     }
 
     if (compaction_id_ % 10 == 0) {
-      rocksdb_trainer_->loadstatedict(rocksdb_trainer_->network, rocksdb_trainer_->target_network);
       std::cout<<"[DQN policy REWARD] : " << reward << std::endl;
     }
   }

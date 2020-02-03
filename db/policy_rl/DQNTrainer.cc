@@ -4,8 +4,8 @@
 #include <math.h>
 #include <chrono>
 
-DQNTrainer::DQNTrainer(int64_t input_channels, int64_t num_actions, int64_t capacity):
-  buffer(capacity),
+DQNTrainer::DQNTrainer(int64_t input_channels, int64_t num_actions, int64_t capacity): 
+  Trainer(capacity),
   network(input_channels, num_actions),
   target_network(input_channels, num_actions),
   dqn_optimizer(network.parameters(), torch::optim::AdamOptions(0.0001).beta1(0.5)){}

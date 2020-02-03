@@ -10,6 +10,7 @@
  *
  * Created on January 31, 2020, 4:20 PM
  */
+#pragma once
 
 class OUNoise {
 private:

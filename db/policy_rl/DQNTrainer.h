@@ -3,11 +3,10 @@
 #include <torch/torch.h>
 #include "ExperienceReplay.h"
 #include "DQN.h"
-#include "Trainer.h"
+#include <Trainer.h>
 
 class DQNTrainer : public Trainer {
   public:
-    ExperienceReplay buffer;
     DQN network, target_network;
     torch::optim::Adam dqn_optimizer;
     double epsilon_start = 0.7;

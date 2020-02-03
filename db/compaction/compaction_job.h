@@ -43,7 +43,6 @@
 #include "util/autovector.h"
 #include "util/stop_watch.h"
 #include "util/thread_local.h"
-#include "db/policy_rl/DQNTrainer.h"
 
 namespace rocksdb {
 
