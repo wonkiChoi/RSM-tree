@@ -914,7 +914,7 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
   cfd->internal_stats()->AddCompactionStats(
       compact_->compaction->output_level(), thread_pri_, compaction_stats_);
   
-  std::vector<float> prev_act;
+  std::vector<double> prev_act;
   auto prefix_extractor =
     compact_->compaction->mutable_cf_options()->prefix_extractor.get();
   
@@ -944,14 +944,16 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
         }
         s  = table_reader->GetIndice(indice);    
       }
-      
-      std::cout << "indice size = " << indice.size() << std::endl;
-      
-      for(uint k = 0; k < indice.size(); k++) {
-        std::cout << "double indice = " << indice[k] << std::endl;
-      }
-      std::cout << " KernelCDf = " << KernelCdf(indice.data(), 1, indice.size()) <<std::endl;  
-      
+
+      for(uint k = 0; k < 65536; k++) {
+        double prob = 0;
+        if(k == 0) {
+          prob = KernelCdf(indice.data(), k, indice.size());
+        } else {
+          prob = KernelCdf(indice.data(), k, indice.size()) - KernelCdf(indice.data(), k-1, indice.size());
+        }
+        rocksdb_trainer_->PrevState.push_back(prob);
+      } 
     }
   }
   
@@ -1005,8 +1007,7 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
   
   if (compact_->compaction->immutable_cf_options()->compaction_pri == kRSMPolicy) {
     float reward = -1 * write_amp; 
-    /* ========================= Training Part ======================= */
-        
+    /* ========================= Training Part ======================= */      
     rocksdb_trainer_->NewState.clear();
     
     for(int i = 1; i < cfd->NumberLevels(); i++) {
@@ -1031,12 +1032,15 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
         s  = table_reader->GetIndice(indice);    
       }
       
-      std::cout << "indice size = " << indice.size() << std::endl;
-      
-      for(uint k = 0; k < indice.size(); k++) {
-        std::cout << "double indice = " << indice[k] << std::endl;
-      }
-      std::cout << " KernelCDf = " << KernelCdf(indice.data(), 1, indice.size()) <<std::endl;       
+      for(uint k = 0; k < 65536; k++) {
+        double prob = 0;
+        if(k == 0) {
+          prob = KernelCdf(indice.data(), k, indice.size());
+        } else {
+          prob = KernelCdf(indice.data(), k, indice.size()) - KernelCdf(indice.data(), k-1, indice.size());
+        }
+        rocksdb_trainer_->NewState.push_back(prob);
+      } 
     }
     
     torch::Tensor state_tensor = torch::tensor(rocksdb_trainer_->PrevState, torch::dtype(torch::kFloat));

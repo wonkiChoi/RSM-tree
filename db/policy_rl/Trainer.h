@@ -19,11 +19,11 @@ class Trainer {
     int64_t batch_size = 32;
     float gamma = 0.99;
     int64_t frame_id = 0;
-    std::vector<float> PreviousAction;
+    std::vector<double> PreviousAction;
     ExperienceReplay buffer;
-    std::vector<float> PrevState;
+    std::vector<double> PrevState;
     torch::Tensor PrevStateTensor;
-    std::vector<float> NewState; 
+    std::vector<double> NewState; 
   
     Trainer(uint64_t capacity) : buffer(capacity){};
     std::vector<float> act(std::vector<float> state){ return std::vector<float>(); };

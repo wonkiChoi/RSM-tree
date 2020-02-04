@@ -2745,6 +2745,20 @@ CompactionPri retCompactionPri(uint64_t index) {
     }
 }
 
+double HexToDouble(std::string &str) {
+  double hx;
+  int nn,r;
+  char *p,pp;
+  for (unsigned int i = 1; i <= str.length(); i++)
+  {
+    r = str.length() - i;
+    pp = str.at(r);
+    nn = strtoul(&pp, &p, 16 );
+    hx = hx + nn * pow(16 , i-1);
+  }  
+  return hx;
+}
+
 void VersionStorageInfo::UpdateFilesByCompactionPri(
     CompactionPri compaction_pri, Trainer * rocksdb_trainer_) {
   if (compaction_style_ == kCompactionStyleNone ||
@@ -2800,9 +2814,17 @@ void VersionStorageInfo::UpdateFilesByCompactionPri(
       case kRSMPolicy:
       {
         rocksdb_trainer_->PreviousAction = rocksdb_trainer_->act(rocksdb_trainer_->PrevState);
+        double act = rocksdb_trainer_->PreviousAction.at(0);
         rocksdb_trainer_->PrevState.clear();
-      }
+        std::sort(temp.begin(), temp.end(), 
+                  [](const Fsize& f1, const Fsize& f2) -> bool {
+                    return sqrt(HexToDouble(f1.file->smallest.user_key().ToString(1))-act)
+                           + sqrt(HexToDouble(f1.file->largest.user_key().ToString(1))-act) <
+                           sqrt(HexToDouble(f2.file->smallest.user_key().ToString(1))-act)
+                           + sqrt(HexToDouble(f2.file->largest.user_key().ToString(1))-act)
+                  });
         break;
+      }
       default:
         assert(false);
     }
