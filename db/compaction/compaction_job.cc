@@ -914,13 +914,17 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
   cfd->internal_stats()->AddCompactionStats(
       compact_->compaction->output_level(), thread_pri_, compaction_stats_);
   
-  std::vector<double> prev_act;
+  std::vector<double> PreviousAction;
   auto prefix_extractor =
     compact_->compaction->mutable_cf_options()->prefix_extractor.get();
   
   if (compact_->compaction->immutable_cf_options()->compaction_pri == kRSMPolicy) {
     rocksdb_trainer_->frame_id = compaction_id_;
-    prev_act = rocksdb_trainer_->PreviousAction;
+    if(rocksdb_trainer_->PreviousAction.size() == 0) {
+      PreviousAction.push_back(0);  
+    } else {
+      PreviousAction.push_back(rocksdb_trainer_->PreviousAction.back());
+    }
     
     auto ostorage = cfd->GetSuperVersion()->current->storage_info();
     for(int i = 1; i < cfd->NumberLevels(); i++) {
@@ -1006,7 +1010,7 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
   
   
   if (compact_->compaction->immutable_cf_options()->compaction_pri == kRSMPolicy) {
-    float reward = -1 * write_amp; 
+    double Reward = -1 * write_amp; 
     /* ========================= Training Part ======================= */      
     rocksdb_trainer_->NewState.clear();
     
@@ -1043,10 +1047,10 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
       } 
     }
     
-    torch::Tensor state_tensor = torch::tensor(rocksdb_trainer_->PrevState, torch::dtype(torch::kFloat));
-    torch::Tensor new_state_tensor = torch::tensor(rocksdb_trainer_->NewState, torch::dtype(torch::kFloat));
-    torch::Tensor action_tensor = torch::tensor(rocksdb_trainer_->PreviousAction, torch::dtype(torch::kFloat));
-    torch::Tensor reward_tensor = torch::tensor(reward, torch::dtype(torch::kFloat));
+    torch::Tensor state_tensor = torch::tensor(rocksdb_trainer_->PrevState, torch::dtype(torch::kDouble));
+    torch::Tensor new_state_tensor = torch::tensor(rocksdb_trainer_->NewState, torch::dtype(torch::kDouble));
+    torch::Tensor action_tensor = torch::tensor(PreviousAction, torch::dtype(torch::kDouble));
+    torch::Tensor reward_tensor = torch::tensor(Reward, torch::dtype(torch::kDouble));
       
     rocksdb_trainer_->buffer.push(state_tensor, new_state_tensor, action_tensor, reward_tensor);
 
@@ -1055,7 +1059,7 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
     }
 
     if (compaction_id_ % 10 == 0) {
-      std::cout<<"[DQN policy REWARD] : " << reward << std::endl;
+      std::cout<<"[DQN policy REWARD] : " << Reward << std::endl;
     }
   }
   

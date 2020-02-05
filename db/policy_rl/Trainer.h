@@ -26,7 +26,7 @@ class Trainer {
     std::vector<double> NewState; 
   
     Trainer(uint64_t capacity) : buffer(capacity){};
-    std::vector<float> act(std::vector<float> state){ return std::vector<float>(); };
+    std::vector<double> act(std::vector<double> state){ return std::vector<double>(); };
     void learn() {};
     
 };

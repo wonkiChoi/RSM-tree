@@ -64,7 +64,7 @@ class DDPGTrainer : public Trainer {
     torch::optim::Adam critic_optimizer;
        
   DDPGTrainer(int64_t input_channels, int64_t num_actions, int64_t capacity);
-  std::vector<float> act(std::vector<float> state);
+  std::vector<double> act(std::vector<double> state);
   void reset() {
     noise->reset();  
   }

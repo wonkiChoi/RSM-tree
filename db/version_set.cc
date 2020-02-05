@@ -2815,13 +2815,26 @@ void VersionStorageInfo::UpdateFilesByCompactionPri(
       {
         rocksdb_trainer_->PreviousAction = rocksdb_trainer_->act(rocksdb_trainer_->PrevState);
         double act = rocksdb_trainer_->PreviousAction.at(0);
+        
         rocksdb_trainer_->PrevState.clear();
         std::sort(temp.begin(), temp.end(), 
-                  [](const Fsize& f1, const Fsize& f2) -> bool {
-                    return sqrt(HexToDouble(f1.file->smallest.user_key().ToString(1))-act)
-                           + sqrt(HexToDouble(f1.file->largest.user_key().ToString(1))-act) <
-                           sqrt(HexToDouble(f2.file->smallest.user_key().ToString(1))-act)
-                           + sqrt(HexToDouble(f2.file->largest.user_key().ToString(1))-act)
+                  [=](const Fsize& f1, const Fsize& f2) -> bool {
+                    
+                    double comp = act * pow(16, f1.file->smallest.user_key().size_ - 4);                   
+                    std::string small_f1;
+                    small_f1.append(f1.file->smallest.user_key().ToString(1));
+                    std::string large_f1;
+                    large_f1.append(f1.file->largest.user_key().ToString(1));
+                    
+                    double val_f1 = pow(HexToDouble(small_f1) - comp, 2) + pow(HexToDouble(large_f1) - comp, 2); 
+                     
+                    std::string small_f2;
+                    small_f2.append(f2.file->smallest.user_key().ToString(1));
+                    std::string large_f2;
+                    large_f2.append(f2.file->largest.user_key().ToString(1));
+                    double val_f2 = pow(HexToDouble(small_f2) - comp, 2) + pow(HexToDouble(large_f2) - comp, 2);
+                    
+                    return val_f1 < val_f2;
                   });
         break;
       }

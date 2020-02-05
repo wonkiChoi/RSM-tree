@@ -106,14 +106,14 @@ DDPGTrainer::DDPGTrainer(int64_t input_channels, int64_t num_actions, int64_t ca
     noise = new OUNoise(static_cast<size_t>(actionSize));   
 }  
 
-std::vector<float> DDPGTrainer::act(std::vector<float> state) {
-  torch::Tensor torchState = torch::tensor(state, torch::dtype(torch::kFloat)).to(torch::kCPU);
+std::vector<double> DDPGTrainer::act(std::vector<double> state) {
+  torch::Tensor torchState = torch::tensor(state, torch::dtype(torch::kDouble)).to(torch::kCPU);
   actor_local->eval();
 
   torch::NoGradGuard guard;
   torch::Tensor action = actor_local->forward(torchState).to(torch::kCPU);
   actor_local->train();
-  std::vector<float> v(action.data_ptr<float>(), action.data_ptr<float>() + action.numel());
+  std::vector<double> v(action.data_ptr<double>(), action.data_ptr<double>() + action.numel());
   noise->sample(v);
   
   for (size_t i =0; i < v.size(); i++) {
