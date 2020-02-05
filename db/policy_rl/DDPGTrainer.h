@@ -20,28 +20,23 @@
 
 class Actor : public torch::nn::Module {
   public:
-    Actor(int64_t state_size, int64_t action_size, int64_t fc1_units=400, int64_t fc2_units=300);
-    void reset_parameters();
-
+    Actor(int64_t state_size, int64_t action_size);
     torch::Tensor forward(torch::Tensor state);
-    torch::nn::BatchNormOptions bn_options(int64_t features);
-    std::pair<double,double> hidden_init(torch::nn::Linear& layer);
 
   private:
-    torch::nn::Linear fc1{nullptr}, fc2{nullptr}, fc3{nullptr};
-    torch::nn::BatchNorm bn1{nullptr};
+    torch::nn::Conv1d conv1{nullptr}, conv2{nullptr};
+    torch::nn::Linear linear1{nullptr}, output{nullptr};
 };
 
 class Critic : public torch::nn::Module {
   public:
-    Critic(int64_t state_size, int64_t action_size, int64_t fcs1_units=400, int64_t fc2_units=300);
-    void reset_parameters();
+    Critic(int64_t state_size, int64_t action_size);
     torch::Tensor forward(torch::Tensor x, torch::Tensor action);
-    std::pair<double,double> hidden_init(torch::nn::Linear& layer);
 
   private:
-    torch::nn::Linear fcs1{nullptr}, fc2{nullptr}, fc3{nullptr};
-    torch::nn::BatchNorm bn1{nullptr};
+    torch::nn::Conv1d conv1{nullptr}, conv2{nullptr};
+    torch::nn::Linear linear1{nullptr};
+    torch::nn::Linear fc1{nullptr}, fc2{nullptr};
 };  
 
 class DDPGTrainer : public Trainer {
