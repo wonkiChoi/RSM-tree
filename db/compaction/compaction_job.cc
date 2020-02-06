@@ -954,7 +954,7 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
         if(k == 0) {
           prob = KernelCdf(indice.data(), k, indice.size());
         } else {
-          prob = KernelCdf(indice.data(), k, indice.size()) - KernelCdf(indice.data(), k-1, indice.size());
+          prob = KernelCdf(indice.data(), k* pow(16, 12), indice.size()) - KernelCdf(indice.data(), (k-1) * pow(16, 12), indice.size());
         }
         rocksdb_trainer_->PrevState.push_back(prob);
       } 
@@ -1041,7 +1041,7 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
         if(k == 0) {
           prob = KernelCdf(indice.data(), k, indice.size());
         } else {
-          prob = KernelCdf(indice.data(), k, indice.size()) - KernelCdf(indice.data(), k-1, indice.size());
+          prob = KernelCdf(indice.data(), k * pow(16, 12), indice.size()) - KernelCdf(indice.data(), (k-1) * pow(16, 12), indice.size());
         }
         rocksdb_trainer_->NewState.push_back(prob);
       } 

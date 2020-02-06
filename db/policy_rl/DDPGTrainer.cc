@@ -52,17 +52,15 @@ torch::Tensor Critic::forward(torch::Tensor input, torch::Tensor action) {
   return fc2->forward(x);
 }
 
-DDPGTrainer::DDPGTrainer(int64_t input_channels, int64_t num_actions, int64_t capacity)
-    : Trainer(capacity), actor_optimizer(actor_local->parameters(), lr_actor), critic_optimizer(critic_local->parameters(), lr_critic){
-    stateSize = input_channels;
-    actionSize = num_actions;
-    
-    actor_local = std::make_shared<Actor>(stateSize, actionSize);
-    actor_target = std::make_shared<Actor>(stateSize, actionSize);
-  
-    critic_local = std::make_shared<Critic>(stateSize, actionSize);
-    critic_target = std::make_shared<Critic>(stateSize, actionSize);
-
+DDPGTrainer::DDPGTrainer(int64_t stateSize, int64_t actionSize, int64_t capacity)
+    : Trainer(capacity),
+      actor_local(std::make_shared<Actor>(stateSize, actionSize)),
+      actor_target(std::make_shared<Actor>(stateSize, actionSize)),
+      actor_optimizer(actor_local->parameters(), lr_actor),
+      critic_local(std::make_shared<Critic>(stateSize, actionSize)),
+      critic_target(std::make_shared<Critic>(stateSize, actionSize)),
+      critic_optimizer(critic_local->parameters(), lr_critic) {
+    std::cout << "DDPG Trainer" << std::endl;
     actor_local->to(torch::Device(torch::kCPU));
     actor_target->to(torch::Device(torch::kCPU));
 

@@ -9,6 +9,7 @@
 #include "db/db_impl/db_impl.h"
 
 #include <cinttypes>
+#include <iostream>
 
 #include "db/builder.h"
 #include "db/error_handler.h"
@@ -1314,6 +1315,7 @@ Status DBImpl::Open(const DBOptions& db_options, const std::string& dbname,
   }
 
   DBImpl* impl = new DBImpl(db_options, dbname, seq_per_batch, batch_per_txn);
+
   s = impl->env_->CreateDirIfMissing(impl->immutable_db_options_.wal_dir);
   if (s.ok()) {
     std::vector<std::string> paths;

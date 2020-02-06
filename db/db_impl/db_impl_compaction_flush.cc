@@ -2744,7 +2744,7 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
         immutable_db_options_.max_subcompactions <= 1 &&
                 c->mutable_cf_options()->snap_refresh_nanos > 0
             ? &fetch_callback
-            : nullptr, &rocksdb_trainer);
+            : nullptr, rocksdb_trainer);
     compaction_job.Prepare();
 
     NotifyOnCompactionBegin(c->column_family_data(), c.get(), status,

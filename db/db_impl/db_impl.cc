@@ -229,8 +229,7 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
       preserve_deletes_(options.preserve_deletes),
       closed_(false),
       error_handler_(this, immutable_db_options_, &mutex_),
-      atomic_flush_install_cv_(&mutex_),
-      rocksdb_trainer(DDPGTrainer(65536,4,64)) {
+      atomic_flush_install_cv_(&mutex_) {
   // !batch_per_trx_ implies seq_per_batch_ because it is only unset for
   // WriteUnprepared, which should use seq_per_batch_.
   assert(batch_per_txn_ || seq_per_batch_);
@@ -260,6 +259,7 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
   // we won't drop any deletion markers until SetPreserveDeletesSequenceNumber()
   // is called by client and this seqnum is advanced.
   preserve_deletes_seqnum_.store(0);
+  rocksdb_trainer = new DDPGTrainer(65536,1,64);
 }
 
 Status DBImpl::Resume() {

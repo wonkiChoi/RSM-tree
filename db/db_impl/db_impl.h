@@ -1959,7 +1959,7 @@ class DBImpl : public DB {
   InstrumentedCondVar atomic_flush_install_cv_;
 
   bool wal_in_db_path_;
-  Trainer rocksdb_trainer;
+  Trainer* rocksdb_trainer;
   std::vector<float> all_rewards;
   //std::vector<torch::Tensor> losses;
 };

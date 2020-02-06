@@ -28,6 +28,7 @@
 #include <mutex>
 #include <thread>
 #include <unordered_map>
+#include <iostream>
 
 #include "db/db_impl/db_impl.h"
 #include "db/malloc_stats.h"
@@ -3772,7 +3773,7 @@ class Benchmark {
     options.persist_stats_to_disk = FLAGS_persist_stats_to_disk;
     options.stats_history_buffer_size =
         static_cast<size_t>(FLAGS_stats_history_buffer_size);
-
+    
     options.compression_opts.level = FLAGS_compression_level;
     options.compression_opts.max_dict_bytes = FLAGS_compression_max_dict_bytes;
     options.compression_opts.zstd_max_train_bytes =
@@ -3791,6 +3792,7 @@ class Benchmark {
             FLAGS_bloom_bits, FLAGS_use_block_based_filter));
       }
     }
+
     if (FLAGS_row_cache_size) {
       if (FLAGS_cache_numshardbits >= 1) {
         options.row_cache =
@@ -3799,6 +3801,7 @@ class Benchmark {
         options.row_cache = NewLRUCache(FLAGS_row_cache_size);
       }
     }
+
     if (FLAGS_enable_io_prio) {
       FLAGS_env->LowerThreadPoolIOPriority(Env::LOW);
       FLAGS_env->LowerThreadPoolIOPriority(Env::HIGH);
@@ -3862,6 +3865,7 @@ class Benchmark {
       delete iter;
       FLAGS_num = keys_.size();
     }
+
   }
 
   void Open(Options* opts) {
@@ -3870,6 +3874,7 @@ class Benchmark {
     }
 
     InitializeOptionsGeneral(opts);
+
   }
 
   void OpenDb(Options options, const std::string& db_name,

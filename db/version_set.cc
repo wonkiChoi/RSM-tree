@@ -2820,7 +2820,7 @@ void VersionStorageInfo::UpdateFilesByCompactionPri(
         std::sort(temp.begin(), temp.end(), 
                   [=](const Fsize& f1, const Fsize& f2) -> bool {
                     
-                    double comp = act * pow(16, f1.file->smallest.user_key().size_ - 4);                   
+                    double comp = act * pow(16, (f1.file->smallest.user_key().size_ * 2) - 4);                   
                     std::string small_f1;
                     small_f1.append(f1.file->smallest.user_key().ToString(1));
                     std::string large_f1;

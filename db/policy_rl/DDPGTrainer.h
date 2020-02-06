@@ -47,8 +47,6 @@ class DDPGTrainer : public Trainer {
     double weight_decay = 0;        // L2 weight decay
     
     OUNoise* noise;
-    int64_t stateSize;
-    int64_t actionSize;
     
     std::shared_ptr<Actor> actor_local;
     std::shared_ptr<Actor> actor_target;
@@ -58,7 +56,7 @@ class DDPGTrainer : public Trainer {
     std::shared_ptr<Critic> critic_target;
     torch::optim::Adam critic_optimizer;
        
-  DDPGTrainer(int64_t input_channels, int64_t num_actions, int64_t capacity);
+  DDPGTrainer(int64_t stateSize, int64_t actionSize, int64_t capacity);
   std::vector<double> act(std::vector<double> state);
   void reset() {
     noise->reset();  
