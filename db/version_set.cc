@@ -2746,8 +2746,9 @@ CompactionPri retCompactionPri(uint64_t index) {
 }
 
 double HexToDouble(std::string &str) {
-  double hx;
+  double hx = 0;
   int nn,r;
+  
   char *p,pp;
   for (unsigned int i = 1; i <= str.length(); i++)
   {
@@ -2755,7 +2756,8 @@ double HexToDouble(std::string &str) {
     pp = str.at(r);
     nn = strtoul(&pp, &p, 16 );
     hx = hx + nn * pow(16 , i-1);
-  }  
+  } 
+
   return hx;
 }
 
@@ -2815,24 +2817,39 @@ void VersionStorageInfo::UpdateFilesByCompactionPri(
       {
         rocksdb_trainer_->PreviousAction = rocksdb_trainer_->act(rocksdb_trainer_->PrevState);
         double act = rocksdb_trainer_->PreviousAction.at(0);
-        
-        rocksdb_trainer_->PrevState.clear();
+ 
         std::sort(temp.begin(), temp.end(), 
                   [=](const Fsize& f1, const Fsize& f2) -> bool {
                     
-                    double comp = act * pow(16, (f1.file->smallest.user_key().size_ * 2) - 4);                   
-                    std::string small_f1;
-                    small_f1.append(f1.file->smallest.user_key().ToString(1));
-                    std::string large_f1;
-                    large_f1.append(f1.file->largest.user_key().ToString(1));
+                    double comp = act * pow(16, (f1.file->smallest.user_key().size_ * 2));
+//                    std::cout << "pow = " << pow(16,2) << std::endl;
+//                    std::cout << "size = " << f1.file->smallest.user_key().size_ << " comp = " << comp << std::endl;
+//                    std::cout << "test = " << pow(16, (f1.file->smallest.user_key().size_ * 2)) <<std::endl;
+                    std::string* small_f1 = new std::string(f1.file->smallest.user_key().ToString(1));
+                    std::string* large_f1 = new std::string(f1.file->largest.user_key().ToString(1));
                     
-                    double val_f1 = pow(HexToDouble(small_f1) - comp, 2) + pow(HexToDouble(large_f1) - comp, 2); 
-                     
-                    std::string small_f2;
-                    small_f2.append(f2.file->smallest.user_key().ToString(1));
-                    std::string large_f2;
-                    large_f2.append(f2.file->largest.user_key().ToString(1));
-                    double val_f2 = pow(HexToDouble(small_f2) - comp, 2) + pow(HexToDouble(large_f2) - comp, 2);
+//                    std::cout << "small_f1 : " << *small_f1 << std::endl; //" double = " << HexToDouble(small_f1) << std::endl;
+//                    std::cout << "large_f1 : " << *large_f1 << std::endl; // " double = " << HexToDouble(large_f1) << std::endl;
+                    double s1 = HexToDouble(*small_f1);
+                    double l1 = HexToDouble(*large_f1);
+                    
+                    delete(small_f1);
+                    delete(large_f1);
+                    
+                    double val_f1 = pow(s1 - comp, 2) + pow(l1 - comp, 2);
+                    
+                    std::string* small_f2 = new std::string(f2.file->smallest.user_key().ToString(1));
+                    std::string* large_f2 = new std::string(f2.file->largest.user_key().ToString(1));
+
+//                    std::cout << "small_f2 : " << *small_f2 << std::endl; //" double = " << HexToDouble(small_f1) << std::endl;
+//                    std::cout << "large_f2 : " << *large_f2 << std::endl; // " double = " << HexToDouble(large_f1) << std::endl;
+                    double s2 = HexToDouble(*small_f2);
+                    double l2 = HexToDouble(*large_f2);
+                    delete(small_f2);
+                    delete(large_f2);
+                    
+                    double val_f2 = pow(s2 - comp, 2) + pow(l2 - comp, 2);
+ 
                     
                     return val_f1 < val_f2;
                   });
@@ -2841,15 +2858,20 @@ void VersionStorageInfo::UpdateFilesByCompactionPri(
       default:
         assert(false);
     }
+
     assert(temp.size() == files.size());
 
     // initialize files_by_compaction_pri_
     for (size_t i = 0; i < temp.size(); i++) {
       files_by_compaction_pri.push_back(static_cast<int>(temp[i].index));
     }
+    
     next_file_to_compact_by_size_[level] = 0;
+    
     assert(files_[level].size() == files_by_compaction_pri_[level].size());
+
   }
+  rocksdb_trainer_->PrevState.clear();
 }
 
 void VersionStorageInfo::GenerateLevel0NonOverlapping() {

@@ -3735,7 +3735,7 @@ Status BlockBasedTable::VerifyChecksum(const ReadOptions& read_options,
 
   double BlockBasedTable::HexToDouble(std::string &str)
   {
-    double hx;
+    double hx = 0;
     int nn,r;
     char *p,pp;
     for (unsigned int i = 1; i <= str.length(); i++)
@@ -3750,7 +3750,6 @@ Status BlockBasedTable::VerifyChecksum(const ReadOptions& read_options,
   }
 
 Status BlockBasedTable::GetIndice(std::vector<double> &indice) {
-  std::cout << "GetIndice() called" <<std::endl;
   InternalIteratorBase<IndexValue>* iiter =
       NewIndexIterator(ReadOptions(),
                        /* disable_prefix_seek */ false, nullptr,
@@ -3766,9 +3765,9 @@ Status BlockBasedTable::GetIndice(std::vector<double> &indice) {
       }
       
       if (i % 1000 == 0) {
-        std::string hexKey;
-        hexKey.append(iiter->user_key().ToString(1));
-        indice.push_back(HexToDouble(hexKey));
+        std::string* hexKey = new std::string(iiter->user_key().ToString(1));
+        indice.push_back(HexToDouble(*hexKey));
+        delete(hexKey);
       }
       i++;
   }

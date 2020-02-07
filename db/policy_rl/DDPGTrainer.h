@@ -57,11 +57,11 @@ class DDPGTrainer : public Trainer {
     torch::optim::Adam critic_optimizer;
        
   DDPGTrainer(int64_t stateSize, int64_t actionSize, int64_t capacity);
-  std::vector<double> act(std::vector<double> state);
+  virtual std::vector<double> act(std::vector<double> state);
   void reset() {
     noise->reset();  
   }
-  void learn();
+  virtual void learn();
   void soft_update(std::shared_ptr<torch::nn::Module> local, std::shared_ptr<torch::nn::Module> target);
   void hard_copy( std::shared_ptr<torch::nn::Module> local, std::shared_ptr<torch::nn::Module> target);
 };

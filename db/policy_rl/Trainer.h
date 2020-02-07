@@ -16,8 +16,8 @@
 
 class Trainer {
   public:
-    int64_t batch_size = 32;
-    float gamma = 0.99;
+    int64_t batch_size = 8;
+    double gamma = 0.99;
     int64_t frame_id = 0;
     std::vector<double> PreviousAction;
     ExperienceReplay buffer;
@@ -26,7 +26,11 @@ class Trainer {
     std::vector<double> NewState; 
   
     Trainer(uint64_t capacity) : buffer(capacity){};
-    std::vector<double> act(std::vector<double> state){ return std::vector<double>(); };
-    void learn() {};
+    virtual ~Trainer(){}
+    virtual std::vector<double> act(std::vector<double> state) {
+      std::cout << "Trainer act function" << std::endl;
+      return std::vector<double>();
+    }
+    virtual void learn() {}
     
 };
