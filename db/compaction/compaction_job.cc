@@ -956,7 +956,7 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
             table_reader = cfd->table_cache()->GetTableReaderFromHandle(handle);
           }
         }
-        s  = table_reader->GetIndice(indice, i);    
+        s  = table_reader->GetIndice(indice, i - 1);    
       }     
     }
     
@@ -1058,7 +1058,7 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
             table_reader = cfd->table_cache()->GetTableReaderFromHandle(handle);
           }
         }
-        s  = table_reader->GetIndice(new_indice, i);    
+        s  = table_reader->GetIndice(new_indice, i - 1);    
       }
     }
     
