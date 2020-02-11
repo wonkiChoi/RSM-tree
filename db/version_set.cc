@@ -2630,6 +2630,10 @@ void SortFileByOverlappingRatio(
   std::unordered_map<uint64_t, uint64_t> file_to_order;
   auto next_level_it = next_level_files.begin();
 
+  uint64_t max_1 = 0;
+  uint64_t max_2 = 0;
+  uint64_t max_3 = 0;
+  
   for (auto& file : files) {
     uint64_t overlapping_bytes = 0;
     // Skip files in next level that is smaller than current file
@@ -2650,9 +2654,19 @@ void SortFileByOverlappingRatio(
     }
 
     assert(file->compensated_file_size != 0);
+    uint64_t comp = overlapping_bytes * 1024u / file->compensated_file_size;
+    if (max_1 < comp) {
+      max_1 = comp;  
+    } else if (max_2 < comp) {
+      max_2 = comp;  
+    } else if (max_3 < comp) {
+      max_3 = comp;  
+    }
+    
     file_to_order[file->fd.GetNumber()] =
         overlapping_bytes * 1024u / file->compensated_file_size;
   }
+  //std::cout << "MAX | " << max_1 << " | " << max_2 << " | " << max_3 << std::endl;
 
   std::sort(temp->begin(), temp->end(),
             [&](const Fsize& f1, const Fsize& f2) -> bool {
@@ -2822,14 +2836,10 @@ void VersionStorageInfo::UpdateFilesByCompactionPri(
                   [=](const Fsize& f1, const Fsize& f2) -> bool {
                     
                     double comp = act * pow(16, (f1.file->smallest.user_key().size_ * 2));
-//                    std::cout << "pow = " << pow(16,2) << std::endl;
-//                    std::cout << "size = " << f1.file->smallest.user_key().size_ << " comp = " << comp << std::endl;
-//                    std::cout << "test = " << pow(16, (f1.file->smallest.user_key().size_ * 2)) <<std::endl;
+
                     std::string* small_f1 = new std::string(f1.file->smallest.user_key().ToString(1));
                     std::string* large_f1 = new std::string(f1.file->largest.user_key().ToString(1));
                     
-//                    std::cout << "small_f1 : " << *small_f1 << std::endl; //" double = " << HexToDouble(small_f1) << std::endl;
-//                    std::cout << "large_f1 : " << *large_f1 << std::endl; // " double = " << HexToDouble(large_f1) << std::endl;
                     double s1 = HexToDouble(*small_f1);
                     double l1 = HexToDouble(*large_f1);
                     
@@ -2841,8 +2851,6 @@ void VersionStorageInfo::UpdateFilesByCompactionPri(
                     std::string* small_f2 = new std::string(f2.file->smallest.user_key().ToString(1));
                     std::string* large_f2 = new std::string(f2.file->largest.user_key().ToString(1));
 
-//                    std::cout << "small_f2 : " << *small_f2 << std::endl; //" double = " << HexToDouble(small_f1) << std::endl;
-//                    std::cout << "large_f2 : " << *large_f2 << std::endl; // " double = " << HexToDouble(large_f1) << std::endl;
                     double s2 = HexToDouble(*small_f2);
                     double l2 = HexToDouble(*large_f2);
                     delete(small_f2);

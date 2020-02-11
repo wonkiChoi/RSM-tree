@@ -7,15 +7,19 @@
 #include "DDPGTrainer.h"
 
 /******************* Actor *******************/
-Actor::Actor(int64_t state_size, int64_t action_size) : torch::nn::Module() {
-  conv1 = register_module("conv1", torch::nn::Conv1d(torch::nn::Conv1dOptions(state_size, 32, 2).stride(1)));
-  conv2 = register_module("conv2", torch::nn::Conv1d(torch::nn::Conv1dOptions(32, 64, 2).stride(1)));
-  linear1 = register_module("linear1", torch::nn::Linear(128, 64));
+Actor::Actor(int64_t channelSize, int64_t action_size) : torch::nn::Module() {
+//  conv1 = register_module("conv1", torch::nn::Conv1d(torch::nn::Conv1dOptions(state_size, 32, 2).stride(1)));
+//  conv2 = register_module("conv2", torch::nn::Conv1d(torch::nn::Conv1dOptions(32, 64, 2).stride(1)));
+//  linear1 = register_module("linear1", torch::nn::Linear(128, 64));
+//  output = register_module("output", torch::nn::Linear(64, action_size));
+  conv1 = register_module("conv1", torch::nn::Conv2d(torch::nn::Conv2dOptions(channelSize, 32, 2).stride(1)));
+  conv2 = register_module("conv2", torch::nn::Conv2d(torch::nn::Conv2dOptions(32, 64, 2).stride(1)));
+  linear1 = register_module("linear1", torch::nn::Linear(64*2*254, 64));
   output = register_module("output", torch::nn::Linear(64, action_size));
 }
 
 torch::Tensor Actor::forward(torch::Tensor input) {
-  input = input.transpose(1, 2);
+  //input = input.transpose(1, 2);
   input = torch::relu(conv1(input));
   input = torch::relu(conv2(input));
 
@@ -29,10 +33,16 @@ torch::Tensor Actor::forward(torch::Tensor input) {
 }
 
 /******************* Critic *****************/
-Critic::Critic(int64_t state_size, int64_t action_size) : torch::nn::Module() {
-  conv1 = register_module("conv1", torch::nn::Conv1d(torch::nn::Conv1dOptions(state_size, 32, 2).stride(1)));
-  conv2 = register_module("conv2", torch::nn::Conv1d(torch::nn::Conv1dOptions(32, 64, 2).stride(1)));
-  linear1 = register_module("linear1", torch::nn::Linear(128, 64));
+Critic::Critic(int64_t channelSize, int64_t action_size) : torch::nn::Module() {
+//  conv1 = register_module("conv1", torch::nn::Conv1d(torch::nn::Conv1dOptions(state_size, 32, 2).stride(1)));
+//  conv2 = register_module("conv2", torch::nn::Conv1d(torch::nn::Conv1dOptions(32, 64, 2).stride(1)));
+//  linear1 = register_module("linear1", torch::nn::Linear(128, 64));
+//  
+//  fc1 = register_module("fc1", torch::nn::Linear(64 + action_size, 32));
+//  fc2 = register_module("fc2", torch::nn::Linear(32, 1));
+  conv1 = register_module("conv1", torch::nn::Conv2d(torch::nn::Conv2dOptions(channelSize, 32, 2).stride(1)));
+  conv2 = register_module("conv2", torch::nn::Conv2d(torch::nn::Conv2dOptions(32, 64, 2).stride(1)));
+  linear1 = register_module("linear1", torch::nn::Linear(64*2*254, 64));
   
   fc1 = register_module("fc1", torch::nn::Linear(64 + action_size, 32));
   fc2 = register_module("fc2", torch::nn::Linear(32, 1));
@@ -42,7 +52,7 @@ torch::Tensor Critic::forward(torch::Tensor input, torch::Tensor action) {
   if (action.dim() == 1) {
     action = torch::unsqueeze(action, 1);
   }
-  input = input.transpose(1, 2);
+  //input = input.transpose(1, 2);
   input = torch::relu(conv1(input));
   input = torch::relu(conv2(input));
 
@@ -55,13 +65,13 @@ torch::Tensor Critic::forward(torch::Tensor input, torch::Tensor action) {
   return fc2->forward(x);
 }
 
-DDPGTrainer::DDPGTrainer(int64_t stateSize, int64_t actionSize, int64_t capacity)
+DDPGTrainer::DDPGTrainer(int64_t channelSize, int64_t actionSize, int64_t capacity)
     : Trainer(capacity),
-      actor_local(std::make_shared<Actor>(stateSize, actionSize)),
-      actor_target(std::make_shared<Actor>(stateSize, actionSize)),
+      actor_local(std::make_shared<Actor>(channelSize, actionSize)),
+      actor_target(std::make_shared<Actor>(channelSize, actionSize)),
       actor_optimizer(actor_local->parameters(), lr_actor),
-      critic_local(std::make_shared<Critic>(stateSize, actionSize)),
-      critic_target(std::make_shared<Critic>(stateSize, actionSize)),
+      critic_local(std::make_shared<Critic>(channelSize, actionSize)),
+      critic_target(std::make_shared<Critic>(channelSize, actionSize)),
       critic_optimizer(critic_local->parameters(), lr_critic) {
  
     actor_local->to(torch::Device(torch::kCPU));
@@ -85,7 +95,7 @@ DDPGTrainer::DDPGTrainer(int64_t stateSize, int64_t actionSize, int64_t capacity
 
 std::vector<double> DDPGTrainer::act(std::vector<double> state) {
   //torch::Tensor torchState = torch::tensor(state, torch::dtype(torch::kDouble)).to(torch::kCPU);
-  torch::Tensor torchState = torch::from_blob(state.data(), {1,4,65536}, torch::dtype(torch::kDouble));
+  torch::Tensor torchState = torch::from_blob(state.data(), {1,4,4,256}, torch::dtype(torch::kDouble));
   actor_local->eval();
 
   torch::NoGradGuard guard;
@@ -130,12 +140,14 @@ void DDPGTrainer::learn() {
   auto Q_expected = critic_local->forward(states_tensor, actions_tensor); 
 
   torch::Tensor critic_loss = torch::mse_loss(Q_expected, Q_targets.detach());
+  std::cout << "CRITIC_LOSS = " << critic_loss << std::endl;
   critic_optimizer.zero_grad();
   critic_loss.backward();
   critic_optimizer.step();
 
   auto actions_pred = actor_local->forward(states_tensor);
   auto actor_loss = -critic_local->forward(states_tensor, actions_pred).mean();
+  std::cout << "ACTOR_LOSS = " << actor_loss << std::endl;
 
   actor_optimizer.zero_grad();
   actor_loss.backward();

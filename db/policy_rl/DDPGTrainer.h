@@ -20,21 +20,23 @@
 
 class Actor : public torch::nn::Module {
   public:
-    Actor(int64_t state_size, int64_t action_size);
+    Actor(int64_t channelSize, int64_t action_size);
     torch::Tensor forward(torch::Tensor state);
 
   private:
-    torch::nn::Conv1d conv1{nullptr}, conv2{nullptr};
+//    torch::nn::Conv1d conv1{nullptr}, conv2{nullptr};
+    torch::nn::Conv2d conv1{nullptr}, conv2{nullptr};
     torch::nn::Linear linear1{nullptr}, output{nullptr};
 };
 
 class Critic : public torch::nn::Module {
   public:
-    Critic(int64_t state_size, int64_t action_size);
+    Critic(int64_t channelSize, int64_t action_size);
     torch::Tensor forward(torch::Tensor x, torch::Tensor action);
 
   private:
-    torch::nn::Conv1d conv1{nullptr}, conv2{nullptr};
+//    torch::nn::Conv1d conv1{nullptr}, conv2{nullptr};
+    torch::nn::Conv2d conv1{nullptr}, conv2{nullptr};
     torch::nn::Linear linear1{nullptr};
     torch::nn::Linear fc1{nullptr}, fc2{nullptr};
 };  
@@ -56,7 +58,7 @@ class DDPGTrainer : public Trainer {
     std::shared_ptr<Critic> critic_target;
     torch::optim::Adam critic_optimizer;
        
-  DDPGTrainer(int64_t stateSize, int64_t actionSize, int64_t capacity);
+  DDPGTrainer(int64_t channelSize, int64_t actionSize, int64_t capacity);
   virtual std::vector<double> act(std::vector<double> state);
   void reset() {
     noise->reset();  

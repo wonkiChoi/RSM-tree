@@ -194,7 +194,7 @@ class BlockBasedTable : public TableReader {
 
   double HexToDouble(std::string &str);
   
-  Status GetIndice(std::vector<double> &indice) override;
+  Status GetIndice(std::vector<std::vector<std::vector<double>>>&indice, int level) override;
   
   ~BlockBasedTable();
 

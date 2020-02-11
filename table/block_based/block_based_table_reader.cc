@@ -3749,7 +3749,7 @@ Status BlockBasedTable::VerifyChecksum(const ReadOptions& read_options,
     return hx;
   }
 
-Status BlockBasedTable::GetIndice(std::vector<double> &indice) {
+Status BlockBasedTable::GetIndice(std::vector<std::vector<std::vector<double>>>&indice, int level) {
   InternalIteratorBase<IndexValue>* iiter =
       NewIndexIterator(ReadOptions(),
                        /* disable_prefix_seek */ false, nullptr,
@@ -3765,9 +3765,20 @@ Status BlockBasedTable::GetIndice(std::vector<double> &indice) {
       }
       
       if (i % 1000 == 0) {
-        std::string* hexKey = new std::string(iiter->user_key().ToString(1));
-        indice.push_back(HexToDouble(*hexKey));
-        delete(hexKey);
+        std::string* hexKey_1 = new std::string(iiter->user_key().ToString(1).substr(0,2));
+        std::string* hexKey_2 = new std::string(iiter->user_key().ToString(1).substr(2,4));
+        std::string* hexKey_3 = new std::string(iiter->user_key().ToString(1).substr(4,6));
+        std::string* hexKey_4 = new std::string(iiter->user_key().ToString(1).substr(6,8));
+        
+        indice.at(0).at(level).push_back(HexToDouble(*hexKey_1));
+        indice.at(1).at(level).push_back(HexToDouble(*hexKey_2));
+        indice.at(2).at(level).push_back(HexToDouble(*hexKey_3));
+        indice.at(3).at(level).push_back(HexToDouble(*hexKey_4));
+        
+        delete(hexKey_1);
+        delete(hexKey_2);
+        delete(hexKey_3);
+        delete(hexKey_4);
       }
       i++;
   }

@@ -926,11 +926,20 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
     } else {
       PreviousAction.push_back(rocksdb_trainer_->PreviousAction.back());
     }
+
+    std::vector<std::vector<std::vector<double>>> indice;
+    for(int i = 0; i < 4; i++) {
+      std::vector<std::vector<double>> level_vector;
+      for(int j = 0; j < cfd->NumberLevels() - 1; j++) {
+        level_vector.push_back(std::vector<double>());
+      }
+      indice.push_back(level_vector);
+    }
     
     auto ostorage = cfd->GetSuperVersion()->current->storage_info();
     for(int i = 1; i < cfd->NumberLevels(); i++) {
       std::vector<FileMetaData*> files = ostorage->LevelFiles(i);
-      std::vector<double> indice;
+                        
       for(unsigned int j = 0; j < files.size(); j++) {
         Status s;
         TableReader* table_reader = nullptr;
@@ -947,20 +956,26 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
             table_reader = cfd->table_cache()->GetTableReaderFromHandle(handle);
           }
         }
-        s  = table_reader->GetIndice(indice);    
-      }
-      
-      for(uint k = 0; k < 65536; k++) {
-        double prob;
-        if (indice.size() == 0) {
-          prob = 0;
-        } else if (k == 0) {
-          prob = KernelCdf(indice.data(), k, indice.size());
-        } else {
-          prob = KernelCdf(indice.data(), k* pow(16, 12), indice.size()) - KernelCdf(indice.data(), (k-1) * pow(16, 12), indice.size());
+        s  = table_reader->GetIndice(indice, i);    
+      }     
+    }
+    
+    for(int i = 0; i < 4; i++) {
+      for(int j = 0; j < cfd->NumberLevels() - 1; j++) {
+        for(uint k = 1; k <= 255; k++) {
+          double prob;
+          std::vector<double> data_vec = indice.at(i).at(j);
+          if (data_vec.size() == 0) {
+            prob = 0;
+          } else if (k == 1) {
+            prob = KernelCdf(data_vec.data(), 256*k, data_vec.size());
+          } else {
+            prob = KernelCdf(data_vec.data(), 256*k, data_vec.size()) 
+                    - KernelCdf(data_vec.data(), 256*(k-1), data_vec.size());
+          }
+          rocksdb_trainer_->PrevState.push_back(prob);
         }
-        rocksdb_trainer_->PrevState.push_back(prob);
-      } 
+      }
     }
   }
   
@@ -1016,9 +1031,17 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
     double Reward = -1 * write_amp; 
     /* ========================= Training Part ======================= */      
     rocksdb_trainer_->NewState.clear();
+    std::vector<std::vector<std::vector<double>>> new_indice;
+    for(int i = 0; i < 4; i++) {
+      std::vector<std::vector<double>> new_level_vector;
+      for(int j = 0; j < cfd->NumberLevels() - 1; j++) {
+        new_level_vector.push_back(std::vector<double>());
+      }
+      new_indice.push_back(new_level_vector);
+    }
+    
     for(int i = 1; i < cfd->NumberLevels(); i++) {
-      std::vector<FileMetaData*> files = vstorage->LevelFiles(i);
-      std::vector<double> indice;
+      std::vector<FileMetaData*> files = vstorage->LevelFiles(i);    
       for(unsigned int j = 0; j < files.size(); j++) {
         Status s;
         TableReader* table_reader = nullptr;
@@ -1035,35 +1058,41 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
             table_reader = cfd->table_cache()->GetTableReaderFromHandle(handle);
           }
         }
-        s  = table_reader->GetIndice(indice);    
+        s  = table_reader->GetIndice(new_indice, i);    
       }
-      
-      for(uint k = 0; k < 65536; k++) {
-        double prob;
-        if (indice.size() == 0) {
-          prob = 0;
-        } else if (k == 0) {
-          prob = KernelCdf(indice.data(), k, indice.size());
-        } else {
-          prob = KernelCdf(indice.data(), k* pow(16, 12), indice.size()) - KernelCdf(indice.data(), (k-1) * pow(16, 12), indice.size());
+    }
+    
+    for(int i = 0; i < 4; i++) {
+      for(int j = 0; j < cfd->NumberLevels() - 1; j++) {
+        for(uint k = 1; k <= 255; k++) {
+          double prob;
+          std::vector<double> data_vec = new_indice.at(i).at(j);
+          if (data_vec.size() == 0) {
+            prob = 0;
+          } else if (k == 1) {
+            prob = KernelCdf(data_vec.data(), 256*k, data_vec.size());
+          } else {
+            prob = KernelCdf(data_vec.data(), 256*k, data_vec.size()) 
+                    - KernelCdf(data_vec.data(), 256*(k-1), data_vec.size());
+          }
+          rocksdb_trainer_->NewState.push_back(prob);
         }
-        rocksdb_trainer_->NewState.push_back(prob);
-      } 
+      }
     }
         
-    torch::Tensor state_tensor = torch::from_blob(rocksdb_trainer_->PrevState.data(), {1, 4, 65536}, torch::dtype(torch::kDouble));
-    torch::Tensor new_state_tensor = torch::from_blob(rocksdb_trainer_->NewState.data(), {1, 4, 65536}, torch::dtype(torch::kDouble));
+    torch::Tensor state_tensor = torch::from_blob(rocksdb_trainer_->PrevState.data(), {1, 4, 4, 256}, torch::dtype(torch::kDouble));
+    torch::Tensor new_state_tensor = torch::from_blob(rocksdb_trainer_->NewState.data(), {1, 4, 4, 256}, torch::dtype(torch::kDouble));
     torch::Tensor action_tensor = torch::tensor(PreviousAction, torch::dtype(torch::kDouble));
     torch::Tensor reward_tensor = torch::tensor(Reward, torch::dtype(torch::kDouble));
 
     rocksdb_trainer_->buffer.push(state_tensor, new_state_tensor, action_tensor, reward_tensor);
 
-    if (rocksdb_trainer_->buffer.size_buffer() >= 10) {
+    if (rocksdb_trainer_->buffer.size_buffer() >= 8) {
       rocksdb_trainer_->learn();
     }
 
-    if (compaction_id_ % 10 == 0) {
-      std::cout<<"[DQN policy REWARD] : " << Reward << std::endl;
+    if (compaction_id_ % 5 == 0) {
+      std::cout<<"[DDPG policy REWARD] : " << Reward << std::endl;
     }
   }
   

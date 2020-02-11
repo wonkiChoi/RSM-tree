@@ -132,7 +132,7 @@ class TableReader {
     return Status::NotSupported("VerifyChecksum() not supported");
   }
       
-  virtual Status GetIndice(std::vector<double> &indice) { return Status::NotSupported("GetIndice not supporetd"); };
+  virtual Status GetIndice(std::vector<std::vector<std::vector<double>>> &indice, int level) { return Status::NotSupported("GetIndice not supporetd"); };
 };
 
 }  // namespace rocksdb

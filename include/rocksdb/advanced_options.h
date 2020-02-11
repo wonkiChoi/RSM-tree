@@ -547,7 +547,7 @@ struct AdvancedColumnFamilyOptions {
   // Default: kMinOverlappingRatio
   CompactionPri compaction_pri = kRSMPolicy;
   //CompactionPri compaction_pri = kMinOverlappingRatio;
-
+  //CompactionPri compaction_pri = kOldestSmallestSeqFirst;
   // The options needed to support Universal Style compactions
   //
   // Dynamically changeable through SetOptions() API
