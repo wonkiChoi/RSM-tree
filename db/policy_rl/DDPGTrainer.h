@@ -67,7 +67,7 @@ class DDPGTrainer : public Trainer {
   void soft_update(std::shared_ptr<torch::nn::Module> local, std::shared_ptr<torch::nn::Module> target);
   void hard_copy( std::shared_ptr<torch::nn::Module> local, std::shared_ptr<torch::nn::Module> target);
   
-  void saveCheckPoints();
-  void loadCheckPoints();
+  virtual void saveCheckPoints();
+  virtual void loadCheckPoints();
 };
 

@@ -32,5 +32,7 @@ class Trainer {
       return std::vector<double>();
     }
     virtual void learn() {}
+    virtual void saveCheckPoints() {};
+    virtual void loadCheckPoints() {};
     
 };

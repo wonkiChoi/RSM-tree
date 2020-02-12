@@ -168,16 +168,17 @@ void DDPGTrainer::hard_copy(std::shared_ptr<torch::nn::Module> local, std::share
 
 void DDPGTrainer::saveCheckPoints()
 {
-//    auto fileActor (path + "checkpoints/ckp_actor_agent" + std::to_string(numOfThisAgent) +"_" + std::to_string(eps) + ".pt");
-//    auto fileCritic(path + "checkpoints/ckp_critic_agent"+ std::to_string(numOfThisAgent) +"_" + std::to_string(eps) + ".pt");
-//    torch::save(std::dynamic_pointer_cast<torch::nn::Module>(actor_local) , fileActor);
-//    torch::save(std::dynamic_pointer_cast<torch::nn::Module>(critic_local) , fileCritic);
+    auto fileActor ("/home/wonki/rsm_checkpoint/ckp_actor.pt");
+    auto fileCritic ("/home/wonki/rsm_checkpoint/ckp_critic.pt");
+    
+    torch::save(std::dynamic_pointer_cast<torch::nn::Module>(actor_local) , fileActor);
+    torch::save(std::dynamic_pointer_cast<torch::nn::Module>(critic_local) , fileCritic);
 }
 
 void DDPGTrainer::loadCheckPoints()
 {
-//    auto fileActor (path + "checkpoints/ckp_actor_agent" + std::to_string(numOfThisAgent) +"_" + std::to_string(eps) + ".pt");
-//    auto fileCritic(path + "checkpoints/ckp_critic_agent"+ std::to_string(numOfThisAgent) +"_" + std::to_string(eps) + ".pt");
-//    torch::load(actor_local, fileActor);
-//    torch::load(critic_local, fileCritic);
+    auto fileActor ("/home/wonki/rsm_checkpoint/ckp_actor.pt");
+    auto fileCritic ("/home/wonki/rsm_checkpoint/ckp_critic.pt");
+    torch::load(actor_local, fileActor);
+    torch::load(critic_local, fileCritic);
 }

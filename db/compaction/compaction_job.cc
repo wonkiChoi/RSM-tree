@@ -1095,6 +1095,10 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
     if (compaction_id_ % 5 == 0) {
       std::cout<<"[DDPG policy REWARD] : " << Reward << std::endl;
     }
+    
+    if(compaction_id_ % 5 == 0) {
+      rocksdb_trainer_->saveCheckPoints();    
+    }
   }
   
   UpdateCompactionJobStats(stats);
