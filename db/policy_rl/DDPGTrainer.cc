@@ -45,20 +45,16 @@ Critic::Critic(int64_t channelSize, int64_t action_size) : torch::nn::Module() {
   linear1 = register_module("linear1", torch::nn::Linear(64*2*254, 64));
   
   fc1 = register_module("fc1", torch::nn::Linear(64 + action_size, 32));
-  fc2 = register_module("fc2", torch::nn::Linear(32, 1));
+  fc2 = register_module("fc2", torch::nn::Linear(32, action_size));
 }
 
 torch::Tensor Critic::forward(torch::Tensor input, torch::Tensor action) {
-  if (action.dim() == 1) {
-    action = torch::unsqueeze(action, 1);
-  }
-  //input = input.transpose(1, 2);
   input = torch::relu(conv1(input));
   input = torch::relu(conv2(input));
 
   input = input.view({input.size(0), -1});
-  
   input = torch::relu(linear1(input));
+  
   auto x = torch::cat({input, action}, /*dim=*/1);
   x = torch::relu(fc1->forward(x));
 
@@ -108,7 +104,7 @@ std::vector<double> DDPGTrainer::act(std::vector<double> state) {
   noise->sample(v);
   
   for (size_t i =0; i < v.size(); i++) {
-    v[i] = std::fmin(std::fmax(v[i],-1.f), 1.f);
+    v[i] = std::fmin(std::fmax(v[i],0.f), 1.f); // 0 =< v[i] =< 1
   }
   return v;
 }
@@ -170,3 +166,18 @@ void DDPGTrainer::hard_copy(std::shared_ptr<torch::nn::Module> local, std::share
   }
 }
 
+void DDPGTrainer::saveCheckPoints()
+{
+//    auto fileActor (path + "checkpoints/ckp_actor_agent" + std::to_string(numOfThisAgent) +"_" + std::to_string(eps) + ".pt");
+//    auto fileCritic(path + "checkpoints/ckp_critic_agent"+ std::to_string(numOfThisAgent) +"_" + std::to_string(eps) + ".pt");
+//    torch::save(std::dynamic_pointer_cast<torch::nn::Module>(actor_local) , fileActor);
+//    torch::save(std::dynamic_pointer_cast<torch::nn::Module>(critic_local) , fileCritic);
+}
+
+void DDPGTrainer::loadCheckPoints()
+{
+//    auto fileActor (path + "checkpoints/ckp_actor_agent" + std::to_string(numOfThisAgent) +"_" + std::to_string(eps) + ".pt");
+//    auto fileCritic(path + "checkpoints/ckp_critic_agent"+ std::to_string(numOfThisAgent) +"_" + std::to_string(eps) + ".pt");
+//    torch::load(actor_local, fileActor);
+//    torch::load(critic_local, fileCritic);
+}

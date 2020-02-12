@@ -922,9 +922,10 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
     std::cout << "compaction = " << compaction_id_ << std::endl;
     rocksdb_trainer_->frame_id = compaction_id_;
     if(rocksdb_trainer_->PreviousAction.size() == 0) {
-      PreviousAction.push_back(0);  
+      for(int i = 0; i < 4; i++)
+        PreviousAction.push_back(0);  
     } else {
-      PreviousAction.push_back(rocksdb_trainer_->PreviousAction.back());
+      PreviousAction = rocksdb_trainer_->PreviousAction;
     }
 
     std::vector<std::vector<std::vector<double>>> indice;
@@ -1085,9 +1086,9 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::v
     torch::Tensor action_tensor = torch::tensor(PreviousAction, torch::dtype(torch::kDouble));
     torch::Tensor reward_tensor = torch::tensor(Reward, torch::dtype(torch::kDouble));
 
-    rocksdb_trainer_->buffer.push(state_tensor, new_state_tensor, action_tensor, reward_tensor);
+    rocksdb_trainer_->buffer.push(state_tensor, new_state_tensor, action_tensor.unsqueeze(0), reward_tensor);
 
-    if (rocksdb_trainer_->buffer.size_buffer() >= 8) {
+    if (rocksdb_trainer_->buffer.size_buffer() >= 16) {
       rocksdb_trainer_->learn();
     }
 

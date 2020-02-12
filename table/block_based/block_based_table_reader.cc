@@ -3756,19 +3756,18 @@ Status BlockBasedTable::GetIndice(std::vector<std::vector<std::vector<double>>>&
                        /* index_entry */ nullptr, /* get_context */ nullptr);
 
   int i = 0;
-  unsigned int len = 0;
+  unsigned int len = 8;
   
   for (iiter->SeekToFirst(); iiter->Valid(); iiter->Next()) {
-      if (i == 0) len = iiter->user_key().size();
       if (iiter->user_key().size() < len) {
-        iiter->Next();
+        continue;
       }
       
       if (i % 1000 == 0) {
-        std::string* hexKey_1 = new std::string(iiter->user_key().ToString(1).substr(0,2));
-        std::string* hexKey_2 = new std::string(iiter->user_key().ToString(1).substr(2,4));
-        std::string* hexKey_3 = new std::string(iiter->user_key().ToString(1).substr(4,6));
-        std::string* hexKey_4 = new std::string(iiter->user_key().ToString(1).substr(6,8));
+        std::string* hexKey_1 = new std::string(iiter->user_key().ToString(1).substr(0,4));
+        std::string* hexKey_2 = new std::string(iiter->user_key().ToString(1).substr(4,8));
+        std::string* hexKey_3 = new std::string(iiter->user_key().ToString(1).substr(8,12));
+        std::string* hexKey_4 = new std::string(iiter->user_key().ToString(1).substr(12,16));
         
         indice.at(0).at(level).push_back(HexToDouble(*hexKey_1));
         indice.at(1).at(level).push_back(HexToDouble(*hexKey_2));

@@ -2830,34 +2830,40 @@ void VersionStorageInfo::UpdateFilesByCompactionPri(
       case kRSMPolicy:
       {
         rocksdb_trainer_->PreviousAction = rocksdb_trainer_->act(rocksdb_trainer_->PrevState);
-        double act = rocksdb_trainer_->PreviousAction.at(0);
+        std::vector<double> act = rocksdb_trainer_->PreviousAction;
  
         std::sort(temp.begin(), temp.end(), 
                   [=](const Fsize& f1, const Fsize& f2) -> bool {
                     
-                    double comp = act * pow(16, (f1.file->smallest.user_key().size_ * 2));
+                    double val_f1 = 0;
+                    for(int i = 0; i < 4; i++) {
+                      double comp = act.at(i) * 65536;
+                      std::string* small_f1 = new std::string(f1.file->smallest.user_key().ToString(1).substr(4*i,4*i + 4));
+                      std::string* large_f1 = new std::string(f1.file->largest.user_key().ToString(1).substr(4*i,4*i + 4));
+                    
+                      double s1 = HexToDouble(*small_f1);
+                      double l1 = HexToDouble(*large_f1);
+                    
+                      delete(small_f1);
+                      delete(large_f1);
+                    
+                      val_f1 += pow(s1 - comp, 2) + pow(l1 - comp, 2);  
+                    }
+                    
+                    double val_f2 = 0;
+                    for(int i = 0; i < 4; i++) {
+                      double comp = act.at(i) * 65536;
+                      std::string* small_f2 = new std::string(f2.file->smallest.user_key().ToString(1).substr(4*i,4*i + 4));
+                      std::string* large_f2 = new std::string(f2.file->largest.user_key().ToString(1).substr(4*i,4*i + 4));
 
-                    std::string* small_f1 = new std::string(f1.file->smallest.user_key().ToString(1));
-                    std::string* large_f1 = new std::string(f1.file->largest.user_key().ToString(1));
+                      double s2 = HexToDouble(*small_f2);
+                      double l2 = HexToDouble(*large_f2);
+                      
+                      delete(small_f2);
+                      delete(large_f2);
                     
-                    double s1 = HexToDouble(*small_f1);
-                    double l1 = HexToDouble(*large_f1);
-                    
-                    delete(small_f1);
-                    delete(large_f1);
-                    
-                    double val_f1 = pow(s1 - comp, 2) + pow(l1 - comp, 2);
-                    
-                    std::string* small_f2 = new std::string(f2.file->smallest.user_key().ToString(1));
-                    std::string* large_f2 = new std::string(f2.file->largest.user_key().ToString(1));
-
-                    double s2 = HexToDouble(*small_f2);
-                    double l2 = HexToDouble(*large_f2);
-                    delete(small_f2);
-                    delete(large_f2);
-                    
-                    double val_f2 = pow(s2 - comp, 2) + pow(l2 - comp, 2);
- 
+                      val_f2 += pow(s2 - comp, 2) + pow(l2 - comp, 2);
+                    }
                     
                     return val_f1 < val_f2;
                   });
