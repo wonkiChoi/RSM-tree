@@ -57,10 +57,6 @@
 #include "util/random.h"
 #include "util/stop_watch.h"
 #include "util/string_util.h"
-#include <gsl/gsl_statistics.h>
-#include <gsl/gsl_sort.h>
-#include <gsl/gsl_math.h>
-#include <gsl/gsl_cdf.h>
 
 namespace rocksdb {
 
@@ -316,7 +312,6 @@ CompactionJob::CompactionJob(
     const std::string& dbname, CompactionJobStats* compaction_job_stats,
     Env::Priority thread_pri, SnapshotListFetchCallback* snap_list_callback)
     : job_id_(job_id),
-      compaction_id_(0),
       compact_(new CompactionState(compaction)),
       compaction_job_stats_(compaction_job_stats),
       compaction_stats_(compaction->compaction_reason(), 1),
@@ -345,62 +340,7 @@ CompactionJob::CompactionJob(
       paranoid_file_checks_(paranoid_file_checks),
       measure_io_stats_(measure_io_stats),
       write_hint_(Env::WLTH_NOT_SET),
-      thread_pri_(thread_pri),
-      rocksdb_trainer_(nullptr) {
-  assert(log_buffer_ != nullptr);
-  const auto* cfd = compact_->compaction->column_family_data();
-  ThreadStatusUtil::SetColumnFamily(cfd, cfd->ioptions()->env,
-                                    db_options_.enable_thread_tracking);
-  ThreadStatusUtil::SetThreadOperation(ThreadStatus::OP_COMPACTION);
-  ReportStartedCompaction(compaction);
-}
-
-
-CompactionJob::CompactionJob(
-    int job_id, int compaction_id, Compaction* compaction, const ImmutableDBOptions& db_options,
-    const EnvOptions env_options, VersionSet* versions,
-    const std::atomic<bool>* shutting_down,
-    const SequenceNumber preserve_deletes_seqnum, LogBuffer* log_buffer,
-    Directory* db_directory, Directory* output_directory, Statistics* stats,
-    InstrumentedMutex* db_mutex, ErrorHandler* db_error_handler,
-    std::vector<SequenceNumber> existing_snapshots,
-    SequenceNumber earliest_write_conflict_snapshot,
-    const SnapshotChecker* snapshot_checker, std::shared_ptr<Cache> table_cache,
-    EventLogger* event_logger, bool paranoid_file_checks, bool measure_io_stats,
-    const std::string& dbname, CompactionJobStats* compaction_job_stats,
-    Env::Priority thread_pri, SnapshotListFetchCallback* snap_list_callback, Trainer * rocksdb_trainer)
-    : job_id_(job_id),
-      compaction_id_(compaction_id),
-      compact_(new CompactionState(compaction)),
-      compaction_job_stats_(compaction_job_stats),
-      compaction_stats_(compaction->compaction_reason(), 1),
-      dbname_(dbname),
-      db_options_(db_options),
-      env_options_(env_options),
-      env_(db_options.env),
-      env_options_for_read_(
-          env_->OptimizeForCompactionTableRead(env_options, db_options_)),
-      versions_(versions),
-      shutting_down_(shutting_down),
-      preserve_deletes_seqnum_(preserve_deletes_seqnum),
-      log_buffer_(log_buffer),
-      db_directory_(db_directory),
-      output_directory_(output_directory),
-      stats_(stats),
-      db_mutex_(db_mutex),
-      db_error_handler_(db_error_handler),
-      existing_snapshots_(std::move(existing_snapshots)),
-      snap_list_callback_(snap_list_callback),
-      earliest_write_conflict_snapshot_(earliest_write_conflict_snapshot),
-      snapshot_checker_(snapshot_checker),
-      table_cache_(std::move(table_cache)),
-      event_logger_(event_logger),
-      bottommost_level_(false),
-      paranoid_file_checks_(paranoid_file_checks),
-      measure_io_stats_(measure_io_stats),
-      write_hint_(Env::WLTH_NOT_SET),
-      thread_pri_(thread_pri),
-      rocksdb_trainer_(rocksdb_trainer) {
+      thread_pri_(thread_pri) {
   assert(log_buffer_ != nullptr);
   const auto* cfd = compact_->compaction->column_family_data();
   ThreadStatusUtil::SetColumnFamily(cfd, cfd->ioptions()->env,
@@ -866,281 +806,17 @@ Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options) {
   return status;
 }
 
-double CompactionJob::nrd0(double x[], const int N) {
-  gsl_sort(x, 1, N);
-  double hi = gsl_stats_sd(x, 1, N);
-  double iqr = gsl_stats_quantile_from_sorted_data (x,1, N,0.75) - gsl_stats_quantile_from_sorted_data (x,1, N,0.25);
-  double lo = GSL_MIN(hi, iqr/1.34);
-  double bw = 0.9 * lo * pow(N,-0.2);
-  return(bw);
-}
-
-double CompactionJob::GaussKernel(double x) { 
-  return exp(-(gsl_pow_2(x)/2))/(M_SQRT2*sqrt(M_PI)); 
-}
-
-double CompactionJob::GaussCdf(double x) { 
-  return gsl_cdf_ugaussian_P(x); 
-}
-
-double CompactionJob::KernelDensity(double *samples, double obs, size_t n) {
-  size_t i;
-  double h = GSL_MAX(nrd0(samples, n), 1e-6);
-  double prob = 0;
-  for(i = 0; i < n; i++)
-  {
-    prob += GaussKernel((samples[i] - obs)/h)/(n*h);
-  }
-  return prob;
-}
-
-double CompactionJob::KernelCdf(double *samples, double obs, size_t n) {
-  size_t i;
-  double h = GSL_MAX(nrd0(samples, n), 1e-6);
-  double prob = 0;
-  for(i = 0; i < n; i++)
-  {
-    prob += GaussCdf((samples[i] - obs)/h)/(n*h);
-  }
-  return prob;
-}
-
-Status CompactionJob::Install(const MutableCFOptions& mutable_cf_options, std::vector<float> &all_rewards) {
-  AutoThreadOperationStageUpdater stage_updater(
-      ThreadStatus::STAGE_COMPACTION_INSTALL);
-  db_mutex_->AssertHeld();
-  Status status = compact_->status;
-  ColumnFamilyData* cfd = compact_->compaction->column_family_data();
-  cfd->internal_stats()->AddCompactionStats(
-      compact_->compaction->output_level(), thread_pri_, compaction_stats_);
-  
-  std::vector<double> PreviousAction;
-  auto prefix_extractor =
-    compact_->compaction->mutable_cf_options()->prefix_extractor.get();
-  
-  if (compact_->compaction->immutable_cf_options()->compaction_pri == kRSMPolicy) {
-    std::cout << "compaction = " << compaction_id_ << std::endl;
-    rocksdb_trainer_->frame_id = compaction_id_;
-    if(rocksdb_trainer_->PreviousAction.size() == 0) {
-      for(int i = 0; i < 4; i++)
-        PreviousAction.push_back(0);  
-    } else {
-      PreviousAction = rocksdb_trainer_->PreviousAction;
-    }
-
-    std::vector<std::vector<std::vector<double>>> indice;
-    for(int i = 0; i < 4; i++) {
-      std::vector<std::vector<double>> level_vector;
-      for(int j = 0; j < cfd->NumberLevels() - 1; j++) {
-        level_vector.push_back(std::vector<double>());
-      }
-      indice.push_back(level_vector);
-    }
-    
-    auto ostorage = cfd->GetSuperVersion()->current->storage_info();
-    for(int i = 1; i < cfd->NumberLevels(); i++) {
-      std::vector<FileMetaData*> files = ostorage->LevelFiles(i);
-                        
-      for(unsigned int j = 0; j < files.size(); j++) {
-        Status s;
-        TableReader* table_reader = nullptr;
-        Cache::Handle* handle = nullptr;
-
-        auto& fd = files[j]->fd;
-        table_reader = fd.table_reader;
-        if (table_reader == nullptr) {
-          s = cfd->table_cache()->FindTable(env_options_, cfd->internal_comparator(), fd, &handle, prefix_extractor,
-                      false /* no_io */,
-                      true /* record_read_stats */, cfd->internal_stats()->GetFileReadHist(compact_->compaction->output_level()),
-                      false, compact_->compaction->output_level());
-          if (s.ok()) {
-            table_reader = cfd->table_cache()->GetTableReaderFromHandle(handle);
-          }
-        }
-        s  = table_reader->GetIndice(indice, i - 1);    
-      }     
-    }
-    
-    for(int i = 0; i < 4; i++) {
-      for(int j = 0; j < cfd->NumberLevels() - 1; j++) {
-        for(uint k = 1; k <= 255; k++) {
-          double prob;
-          std::vector<double> data_vec = indice.at(i).at(j);
-          if (data_vec.size() == 0) {
-            prob = 0;
-          } else if (k == 1) {
-            prob = KernelCdf(data_vec.data(), 256*k, data_vec.size());
-          } else {
-            prob = KernelCdf(data_vec.data(), 256*k, data_vec.size()) 
-                    - KernelCdf(data_vec.data(), 256*(k-1), data_vec.size());
-          }
-          rocksdb_trainer_->PrevState.push_back(prob);
-        }
-      }
-    }
-  }
-  
-  if (status.ok()) {
-    status = InstallCompactionResults(mutable_cf_options);
-  }
-        
-  VersionStorageInfo::LevelSummaryStorage tmp;
-  auto vstorage = cfd->current()->storage_info();
+double CompactionJob::CalculateReward() {
   const auto& stats = compaction_stats_;
 
-  double read_write_amp = 0.0;
   double write_amp = 0.0;
-  double bytes_read_per_sec = 0;
-  double bytes_written_per_sec = 0;
-
   if (stats.bytes_read_non_output_levels > 0) {
-    read_write_amp = (stats.bytes_written + stats.bytes_read_output_level +
-                      stats.bytes_read_non_output_levels) /
-                     static_cast<double>(stats.bytes_read_non_output_levels);
     write_amp = stats.bytes_written /
                 static_cast<double>(stats.bytes_read_non_output_levels);
   }
-  if (stats.micros > 0) {
-    bytes_read_per_sec =
-        (stats.bytes_read_non_output_levels + stats.bytes_read_output_level) /
-        static_cast<double>(stats.micros);
-    bytes_written_per_sec =
-        stats.bytes_written / static_cast<double>(stats.micros);
-  }
-
-  ROCKS_LOG_BUFFER(
-      log_buffer_,
-      "[%s] compacted to: %s, MB/sec: %.1f rd, %.1f wr, level %d, "
-      "files in(%d, %d) out(%d) "
-      "MB in(%.1f, %.1f) out(%.1f), read-write-amplify(%.1f) "
-      "write-amplify(%.1f) %s, records in: %" PRIu64
-      ", records dropped: %" PRIu64 " output_compression: %s\n",
-      cfd->GetName().c_str(), vstorage->LevelSummary(&tmp), bytes_read_per_sec,
-      bytes_written_per_sec, compact_->compaction->output_level(),
-      stats.num_input_files_in_non_output_levels,
-      stats.num_input_files_in_output_level, stats.num_output_files,
-      stats.bytes_read_non_output_levels / 1048576.0,
-      stats.bytes_read_output_level / 1048576.0,
-      stats.bytes_written / 1048576.0, read_write_amp, write_amp,
-      status.ToString().c_str(), stats.num_input_records,
-      stats.num_dropped_records,
-      CompressionTypeToString(compact_->compaction->output_compression())
-          .c_str());
+  write_amp = -1 * write_amp;
   
-  
-  if (compact_->compaction->immutable_cf_options()->compaction_pri == kRSMPolicy) {
-    double Reward = -1 * write_amp; 
-    /* ========================= Training Part ======================= */      
-    rocksdb_trainer_->NewState.clear();
-    std::vector<std::vector<std::vector<double>>> new_indice;
-    for(int i = 0; i < 4; i++) {
-      std::vector<std::vector<double>> new_level_vector;
-      for(int j = 0; j < cfd->NumberLevels() - 1; j++) {
-        new_level_vector.push_back(std::vector<double>());
-      }
-      new_indice.push_back(new_level_vector);
-    }
-    
-    for(int i = 1; i < cfd->NumberLevels(); i++) {
-      std::vector<FileMetaData*> files = vstorage->LevelFiles(i);    
-      for(unsigned int j = 0; j < files.size(); j++) {
-        Status s;
-        TableReader* table_reader = nullptr;
-        Cache::Handle* handle = nullptr;
-
-        auto& fd = files[j]->fd;
-        table_reader = fd.table_reader;
-        if (table_reader == nullptr) {
-          s = cfd->table_cache()->FindTable(env_options_, cfd->internal_comparator(), fd, &handle, prefix_extractor,
-                      false /* no_io */,
-                      true /* record_read_stats */, cfd->internal_stats()->GetFileReadHist(compact_->compaction->output_level()),
-                      false, compact_->compaction->output_level());
-          if (s.ok()) {
-            table_reader = cfd->table_cache()->GetTableReaderFromHandle(handle);
-          }
-        }
-        s  = table_reader->GetIndice(new_indice, i - 1);    
-      }
-    }
-    
-    for(int i = 0; i < 4; i++) {
-      for(int j = 0; j < cfd->NumberLevels() - 1; j++) {
-        for(uint k = 1; k <= 255; k++) {
-          double prob;
-          std::vector<double> data_vec = new_indice.at(i).at(j);
-          if (data_vec.size() == 0) {
-            prob = 0;
-          } else if (k == 1) {
-            prob = KernelCdf(data_vec.data(), 256*k, data_vec.size());
-          } else {
-            prob = KernelCdf(data_vec.data(), 256*k, data_vec.size()) 
-                    - KernelCdf(data_vec.data(), 256*(k-1), data_vec.size());
-          }
-          rocksdb_trainer_->NewState.push_back(prob);
-        }
-      }
-    }
-        
-    torch::Tensor state_tensor = torch::from_blob(rocksdb_trainer_->PrevState.data(), {1, 4, 4, 256}, torch::dtype(torch::kDouble));
-    torch::Tensor new_state_tensor = torch::from_blob(rocksdb_trainer_->NewState.data(), {1, 4, 4, 256}, torch::dtype(torch::kDouble));
-    torch::Tensor action_tensor = torch::tensor(PreviousAction, torch::dtype(torch::kDouble));
-    torch::Tensor reward_tensor = torch::tensor(Reward, torch::dtype(torch::kDouble));
-
-    rocksdb_trainer_->buffer.push(state_tensor, new_state_tensor, action_tensor.unsqueeze(0), reward_tensor);
-
-    if (rocksdb_trainer_->buffer.size_buffer() >= 16) {
-      rocksdb_trainer_->learn();
-    }
-
-    if (compaction_id_ % 5 == 0) {
-      std::cout<<"[DDPG policy REWARD] : " << Reward << std::endl;
-    }
-    
-    if(compaction_id_ % 5 == 0) {
-      rocksdb_trainer_->saveCheckPoints();    
-    }
-  }
-  
-  UpdateCompactionJobStats(stats);
-
-  auto stream = event_logger_->LogToBuffer(log_buffer_);
-  stream << "job" << job_id_ << "event"
-         << "compaction_finished"
-         << "compaction_time_micros" << compaction_stats_.micros
-         << "compaction_time_cpu_micros" << compaction_stats_.cpu_micros
-         << "output_level" << compact_->compaction->output_level()
-         << "num_output_files" << compact_->NumOutputFiles()
-         << "total_output_size" << compact_->total_bytes << "num_input_records"
-         << compact_->num_input_records << "num_output_records"
-         << compact_->num_output_records << "num_subcompactions"
-         << compact_->sub_compact_states.size() << "output_compression"
-         << CompressionTypeToString(compact_->compaction->output_compression());
-
-  if (compaction_job_stats_ != nullptr) {
-    stream << "num_single_delete_mismatches"
-           << compaction_job_stats_->num_single_del_mismatch;
-    stream << "num_single_delete_fallthrough"
-           << compaction_job_stats_->num_single_del_fallthru;
-  }
-
-  if (measure_io_stats_ && compaction_job_stats_ != nullptr) {
-    stream << "file_write_nanos" << compaction_job_stats_->file_write_nanos;
-    stream << "file_range_sync_nanos"
-           << compaction_job_stats_->file_range_sync_nanos;
-    stream << "file_fsync_nanos" << compaction_job_stats_->file_fsync_nanos;
-    stream << "file_prepare_write_nanos"
-           << compaction_job_stats_->file_prepare_write_nanos;
-  }
-
-  stream << "lsm_state";
-  stream.StartArray();
-  for (int level = 0; level < vstorage->num_levels(); ++level) {
-    stream << vstorage->NumLevelFiles(level);
-  }
-  stream.EndArray();
-
-  CleanupCompaction();
-  return status;
+  return write_amp;
 }
 
 void CompactionJob::ProcessKeyValueCompaction(SubcompactionState* sub_compact) {
@@ -1742,9 +1418,9 @@ Status CompactionJob::InstallCompactionResults(
       compaction->edit()->AddFile(compaction->output_level(), out.meta);
     }
   }
-  return versions_->LogAndApplyWithTrain(compaction->column_family_data(),
+  return versions_->LogAndApply(compaction->column_family_data(),
                                 mutable_cf_options, compaction->edit(),
-                                db_mutex_, rocksdb_trainer_, db_directory_);
+                                db_mutex_, db_directory_);
 }
 
 void CompactionJob::RecordCompactionIOStats() {

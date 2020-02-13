@@ -55,6 +55,21 @@ class LevelCompactionBuilder {
         log_buffer_(log_buffer),
         mutable_cf_options_(mutable_cf_options),
         ioptions_(ioptions) {}
+      
+  LevelCompactionBuilder(const std::string& cf_name,
+                         VersionStorageInfo* vstorage,
+                         CompactionPicker* compaction_picker,
+                         LogBuffer* log_buffer,
+                         const MutableCFOptions& mutable_cf_options,
+                         const ImmutableCFOptions& ioptions,
+                         Trainer* trainer)
+      : cf_name_(cf_name),
+        vstorage_(vstorage),
+        compaction_picker_(compaction_picker),
+        log_buffer_(log_buffer),
+        mutable_cf_options_(mutable_cf_options),
+        ioptions_(ioptions),
+        trainer_(trainer) {}
 
   // Pick and return a compaction.
   Compaction* PickCompaction();
@@ -119,6 +134,12 @@ class LevelCompactionBuilder {
                             int level);
 
   static const int kMinFilesForIntraL0Compaction = 4;
+  Trainer* trainer_;
+  
+  struct Fsize {
+    size_t index;
+    FileMetaData* file;
+  };
 };
 
 void LevelCompactionBuilder::PickExpiredTtlFiles() {
@@ -450,6 +471,22 @@ uint32_t LevelCompactionBuilder::GetPathId(
   }
   return p;
 }
+                  
+double HexToDouble(std::string &str) {
+  double hx = 0;
+  int nn,r;
+  
+  char *p,pp;
+  for (unsigned int i = 1; i <= str.length(); i++)
+  {
+    r = str.length() - i;
+    pp = str.at(r);
+    nn = strtoul(&pp, &p, 16 );
+    hx = hx + nn * pow(16 , i-1);
+  } 
+
+  return hx;
+}
 
 bool LevelCompactionBuilder::PickFileToCompact() {
   // level 0 files are overlapping. So we cannot pick more
@@ -468,6 +505,59 @@ bool LevelCompactionBuilder::PickFileToCompact() {
 
   // Pick the largest file in this level that is not already
   // being compacted
+  if(ioptions_.compaction_pri == kRSMPolicy && start_level_ != 0) {
+    std::cout << "Action area" <<std::endl;
+    std::vector<int>& files_ = vstorage_->FilesByCompactionPriNonConst(start_level_);
+    files_.clear();
+    const std::vector<FileMetaData*>& level_files = vstorage_->LevelFiles(start_level_);
+    std::vector<Fsize> temp(level_files.size());
+    for (size_t i = 0; i < level_files.size(); i++) {
+      temp[i].index = i;
+      temp[i].file = level_files[i];
+    }
+    trainer_->Action = trainer_->act(trainer_->PrevState);
+    std::vector<double> act = trainer_->Action;
+       
+    std::sort(temp.begin(), temp.end(),
+            [=](const Fsize& f1, const Fsize& f2) -> bool {
+                double val_f1 = 0;
+                for(int i = 0; i < 4 /*channel_size*/; i++) {
+                  double comp = act.at((start_level_-1)*4 + i) * 65536;
+                  std::string* small_f1 = new std::string(f1.file->smallest.user_key().ToString(1).substr(4*i,4*i + 4));
+                  std::string* large_f1 = new std::string(f1.file->largest.user_key().ToString(1).substr(4*i,4*i + 4));
+                    
+                  double s1 = HexToDouble(*small_f1);
+                  double l1 = HexToDouble(*large_f1);
+                    
+                  delete(small_f1);
+                  delete(large_f1);
+                    
+                  val_f1 += pow(s1 - comp, 2) + pow(l1 - comp, 2);  
+                }
+                    
+                double val_f2 = 0;
+                for(int i = 0; i < 4; i++) {
+                  double comp = act.at((start_level_-1)*i) * 65536;
+                  std::string* small_f2 = new std::string(f2.file->smallest.user_key().ToString(1).substr(4*i,4*i + 4));
+                  std::string* large_f2 = new std::string(f2.file->largest.user_key().ToString(1).substr(4*i,4*i + 4));
+
+                  double s2 = HexToDouble(*small_f2);
+                  double l2 = HexToDouble(*large_f2);
+                      
+                  delete(small_f2);
+                  delete(large_f2);
+                    
+                  val_f2 += pow(s2 - comp, 2) + pow(l2 - comp, 2);
+                }    
+                  return val_f1 < val_f2;
+                });
+    
+    for (size_t i = 0; i < temp.size(); i++) {
+      files_.push_back(static_cast<int>(temp[i].index));
+    }
+    vstorage_->SetNextCompactionIndex(start_level_, 0);
+  }
+                       
   const std::vector<int>& file_size =
       vstorage_->FilesByCompactionPri(start_level_);
   const std::vector<FileMetaData*>& level_files =
@@ -548,6 +638,14 @@ Compaction* LevelCompactionPicker::PickCompaction(
     VersionStorageInfo* vstorage, LogBuffer* log_buffer) {
   LevelCompactionBuilder builder(cf_name, vstorage, this, log_buffer,
                                  mutable_cf_options, ioptions_);
+  return builder.PickCompaction();
+}
+
+Compaction* LevelCompactionPicker::PickCompactionRL(
+    const std::string& cf_name, const MutableCFOptions& mutable_cf_options,
+    VersionStorageInfo* vstorage, LogBuffer* log_buffer, Trainer* trainer) {
+  LevelCompactionBuilder builder(cf_name, vstorage, this, log_buffer,
+                                 mutable_cf_options, ioptions_, trainer);
   return builder.PickCompaction();
 }
 }  // namespace rocksdb

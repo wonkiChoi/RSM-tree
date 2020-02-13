@@ -26,6 +26,7 @@
 #include "rocksdb/options.h"
 #include "trace_replay/block_cache_tracer.h"
 #include "util/thread_local.h"
+#include "db/policy_rl/Trainer.h"
 
 namespace rocksdb {
 
@@ -382,6 +383,10 @@ class ColumnFamilyData {
   // REQUIRES: DB mutex held
   Compaction* PickCompaction(const MutableCFOptions& mutable_options,
                              LogBuffer* log_buffer);
+  
+  Compaction* PickCompaction(const MutableCFOptions& mutable_options,
+                             LogBuffer* log_buffer,
+                             Trainer* trainer);
 
   // Check if the passed range overlap with any running compactions.
   // REQUIRES: DB mutex held

@@ -16,14 +16,13 @@
 
 class Trainer {
   public:
-    int64_t batch_size = 8;
+    int64_t batch_size = 4;
     double gamma = 0.99;
     int64_t frame_id = 0;
-    std::vector<double> PreviousAction;
+    std::vector<double> Action;
     ExperienceReplay buffer;
     std::vector<double> PrevState;
-    torch::Tensor PrevStateTensor;
-    std::vector<double> NewState; 
+    std::vector<double> PostState; 
   
     Trainer(uint64_t capacity) : buffer(capacity){};
     virtual ~Trainer(){}

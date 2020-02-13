@@ -76,21 +76,6 @@ class CompactionJob {
       bool paranoid_file_checks, bool measure_io_stats,
       const std::string& dbname, CompactionJobStats* compaction_job_stats,
       Env::Priority thread_pri, SnapshotListFetchCallback* snap_list_callback);
-  
-  CompactionJob(
-      int job_id, int compaction_id, Compaction* compaction, const ImmutableDBOptions& db_options,
-      const EnvOptions env_options, VersionSet* versions,
-      const std::atomic<bool>* shutting_down,
-      const SequenceNumber preserve_deletes_seqnum, LogBuffer* log_buffer,
-      Directory* db_directory, Directory* output_directory, Statistics* stats,
-      InstrumentedMutex* db_mutex, ErrorHandler* db_error_handler,
-      std::vector<SequenceNumber> existing_snapshots,
-      SequenceNumber earliest_write_conflict_snapshot,
-      const SnapshotChecker* snapshot_checker,
-      std::shared_ptr<Cache> table_cache, EventLogger* event_logger,
-      bool paranoid_file_checks, bool measure_io_stats,
-      const std::string& dbname, CompactionJobStats* compaction_job_stats,
-      Env::Priority thread_pri, SnapshotListFetchCallback* snap_list_callback, Trainer* rocksdb_trainer);
 
   ~CompactionJob();
 
@@ -112,7 +97,8 @@ class CompactionJob {
   // Add compaction input/output to the current version
   
   Status Install(const MutableCFOptions& mutable_cf_options);
-  Status Install(const MutableCFOptions& mutable_cf_options, std::vector<float> &all_rewards);
+  double CalculateReward();
+
 
  private:
   struct SubcompactionState;
@@ -160,8 +146,7 @@ class CompactionJob {
   double KernelCdf(double *samples, double obs, size_t n);
   
   int job_id_;
-  int compaction_id_;
-
+ 
   // CompactionJob state
   struct CompactionState;
   CompactionState* compact_;
@@ -213,7 +198,6 @@ class CompactionJob {
   std::vector<uint64_t> sizes_;
   Env::WriteLifeTimeHint write_hint_;
   Env::Priority thread_pri_;
-  Trainer * rocksdb_trainer_;
 };
 
 }  // namespace rocksdb

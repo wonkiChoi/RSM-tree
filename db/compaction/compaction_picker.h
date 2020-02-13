@@ -58,6 +58,11 @@ class CompactionPicker {
                                      const MutableCFOptions& mutable_cf_options,
                                      VersionStorageInfo* vstorage,
                                      LogBuffer* log_buffer) = 0;
+  
+  virtual Compaction* PickCompactionRL(const std::string& cf_name,
+                                     const MutableCFOptions& mutable_cf_options,
+                                     VersionStorageInfo* vstorage,
+                                     LogBuffer* log_buffer, Trainer* trainer) { return nullptr; }
 
   // Return a compaction object for compacting the range [begin,end] in
   // the specified level.  Returns nullptr if there is nothing in that

@@ -22,6 +22,11 @@
 #include "util/cast_util.h"
 #include "util/concurrent_task_limiter_impl.h"
 
+#include <gsl/gsl_statistics.h>
+#include <gsl/gsl_sort.h>
+#include <gsl/gsl_math.h>
+#include <gsl/gsl_cdf.h>
+
 namespace rocksdb {
 
 bool DBImpl::EnoughRoomForCompaction(
@@ -2397,6 +2402,162 @@ void DBImpl::BackgroundCallCompaction(PrepickedCompaction* prepicked_compaction,
   }
 }
 
+double nrd0(double x[], const int N) {
+  gsl_sort(x, 1, N);
+  double hi = gsl_stats_sd(x, 1, N);
+  double iqr = gsl_stats_quantile_from_sorted_data (x,1, N,0.75) - gsl_stats_quantile_from_sorted_data (x,1, N,0.25);
+  double lo = GSL_MIN(hi, iqr/1.34);
+  double bw = 0.9 * lo * pow(N,-0.2);
+  return(bw);
+}
+
+double GaussKernel(double x) { 
+  return exp(-(gsl_pow_2(x)/2))/(M_SQRT2*sqrt(M_PI)); 
+}
+
+double GaussCdf(double x) { 
+  return gsl_cdf_ugaussian_P(x); 
+}
+
+double KernelDensity(double *samples, double obs, size_t n) {
+  size_t i;
+  double h = GSL_MAX(nrd0(samples, n), 1e-6);
+  double prob = 0;
+  for(i = 0; i < n; i++)
+  {
+    prob += GaussKernel((samples[i] - obs)/h)/(n*h);
+  }
+  return prob;
+}
+
+double KernelCdf(double *samples, double obs, size_t n) {
+  size_t i;
+  double h = GSL_MAX(nrd0(samples, n), 1e-6);
+  double prob = 0;
+  for(i = 0; i < n; i++)
+  {
+    prob += GaussCdf((samples[i] - obs)/h)/(n*h);
+  }
+  return prob;
+}
+
+void DBImpl::SetInputState(ColumnFamilyData* cfd) {
+        std::cout << "SetInputState" <<std::endl;
+  auto ostorage = cfd->GetSuperVersion()->current->storage_info();
+  rocksdb_trainer->PrevState.clear();  
+  std::vector<std::vector<std::vector<double>>> indice;
+  
+  for(int i = 0; i < channel_size; i++) {
+    std::vector<std::vector<double>> level_vector;
+    for(int j = 0; j < cfd->NumberLevels() - 1; j++) {
+      level_vector.push_back(std::vector<double>());
+    }
+    indice.push_back(level_vector);
+  }
+    
+  for(int i = 1; i < cfd->NumberLevels(); i++) {
+    std::vector<FileMetaData*> files = ostorage->LevelFiles(i);
+    
+    for(unsigned int j = 0; j < files.size(); j++) {
+      Status s;
+      TableReader* table_reader = nullptr;
+      Cache::Handle* handle = nullptr;
+
+      auto& fd = files[j]->fd;
+      table_reader = fd.table_reader;
+      if (table_reader == nullptr) {
+        s = cfd->table_cache()->FindTable(env_options_, cfd->internal_comparator(), fd, &handle, nullptr,
+                false /* no_io */,
+                true /* record_read_stats */,
+                nullptr,
+                false, i);
+        if (s.ok()) {
+          table_reader = cfd->table_cache()->GetTableReaderFromHandle(handle);
+        }
+      }
+        s  = table_reader->GetIndice(indice, i - 1);    
+    }     
+  }
+    
+  for(int i = 0; i < channel_size; i++) {
+    for(int j = 0; j < cfd->NumberLevels() - 1; j++) {
+      double sum_prob = 0.0;
+      for(uint k = 1; k <= 255; k++) {
+        double prob;
+        std::vector<double> data_vec = indice.at(i).at(j);
+        if (data_vec.size() == 0) {
+          prob = 0;
+        } else if (k == 1) {
+          prob = KernelCdf(data_vec.data(), 256*k, data_vec.size());
+          sum_prob += prob;
+        } else {
+          prob = KernelCdf(data_vec.data(), 256*k, data_vec.size())
+                  - KernelCdf(data_vec.data(), 256*(k-1), data_vec.size());
+          sum_prob += prob;
+        }
+        rocksdb_trainer->PrevState.push_back(prob);
+      }
+      //std::cout << "prob : " << sum_prob <<std::endl;
+    }
+  }  
+}
+
+void DBImpl::SetOutputState(ColumnFamilyData* cfd) {
+    std::cout << "SetOutputState" <<std::endl;
+  auto vstorage = cfd->current()->storage_info();
+  rocksdb_trainer->PostState.clear();
+  std::vector<std::vector<std::vector<double>>> new_indice;
+  
+  for(int i = 0; i < channel_size; i++) {
+    std::vector<std::vector<double>> new_level_vector;
+    for(int j = 0; j < cfd->NumberLevels() - 1; j++) {
+      new_level_vector.push_back(std::vector<double>());
+    }
+    new_indice.push_back(new_level_vector);
+  }
+    
+  for(int i = 1; i < cfd->NumberLevels(); i++) {
+    std::vector<FileMetaData*> files = vstorage->LevelFiles(i);    
+    for(unsigned int j = 0; j < files.size(); j++) {
+      Status s;
+      TableReader* table_reader = nullptr;
+      Cache::Handle* handle = nullptr;
+
+      auto& fd = files[j]->fd;
+      table_reader = fd.table_reader;
+      if (table_reader == nullptr) {
+        s = cfd->table_cache()->FindTable(env_options_, cfd->internal_comparator(), fd, &handle, nullptr,
+                false /* no_io */,
+                true /* record_read_stats */,
+                nullptr,
+                false, i);
+        if (s.ok()) {
+          table_reader = cfd->table_cache()->GetTableReaderFromHandle(handle);
+        }
+      }
+      s  = table_reader->GetIndice(new_indice, i - 1);    
+    }
+  }
+    
+  for(int i = 0; i < channel_size; i++) {
+    for(int j = 0; j < cfd->NumberLevels() - 1; j++) {
+      for(uint k = 1; k <= 255; k++) {
+        double prob;
+        std::vector<double> data_vec = new_indice.at(i).at(j);
+        if (data_vec.size() == 0) {
+          prob = 0;
+        } else if (k == 1) {
+          prob = KernelCdf(data_vec.data(), 256*k, data_vec.size());
+          } else {
+          prob = KernelCdf(data_vec.data(), 256*k, data_vec.size()) 
+                  - KernelCdf(data_vec.data(), 256*(k-1), data_vec.size());
+        }
+        rocksdb_trainer->PostState.push_back(prob);
+      }
+    }
+  }
+}
+
 Status DBImpl::BackgroundCompaction(bool* made_progress,
                                     JobContext* job_context,
                                     LogBuffer* log_buffer,
@@ -2528,7 +2689,7 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
       delete cfd;
       return Status::OK();
     }
-
+    
     // Pick up latest mutable CF Options and use it throughout the
     // compaction job
     // Compaction makes a copy of the latest MutableCFOptions. It should be used
@@ -2540,7 +2701,14 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
       // compaction is not necessary. Need to make sure mutex is held
       // until we make a copy in the following code
       TEST_SYNC_POINT("DBImpl::BackgroundCompaction():BeforePickCompaction");
-      c.reset(cfd->PickCompaction(*mutable_cf_options, log_buffer));
+ 
+      if (cfd->ioptions()->compaction_pri == kRSMPolicy) {
+        SetInputState(cfd);
+        c.reset(cfd->PickCompaction(*mutable_cf_options, log_buffer, rocksdb_trainer));
+      } else {
+        c.reset(cfd->PickCompaction(*mutable_cf_options, log_buffer));
+      }
+      
       TEST_SYNC_POINT("DBImpl::BackgroundCompaction():AfterPickCompaction");
 
       if (c != nullptr) {
@@ -2593,6 +2761,7 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
     // Nothing to do
     ROCKS_LOG_BUFFER(log_buffer, "Compaction nothing to do");
   } else if (c->deletion_compaction()) {
+    std::cout << "Deletion Compaction" <<std::endl;
     // TODO(icanadi) Do we want to honor snapshots here? i.e. not delete old
     // file if there is alive snapshot pointing to it
     TEST_SYNC_POINT_CALLBACK("DBImpl::BackgroundCompaction:BeforeCompaction",
@@ -2623,6 +2792,7 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
     TEST_SYNC_POINT_CALLBACK("DBImpl::BackgroundCompaction:AfterCompaction",
                              c->column_family_data());
   } else if (!trivial_move_disallowed && c->IsTrivialMove()) {
+    std::cout << "Trivial Mode" <<std::endl;
     TEST_SYNC_POINT("DBImpl::BackgroundCompaction:TrivialMove");
     TEST_SYNC_POINT_CALLBACK("DBImpl::BackgroundCompaction:BeforeCompaction",
                              c->column_family_data());
@@ -2701,6 +2871,7 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
                      ->MaxOutputLevel(
                          immutable_db_options_.allow_ingest_behind) &&
              env_->GetBackgroundThreads(Env::Priority::BOTTOM) > 0) {
+    std::cout << "Ingest Option" <<std::endl;
     // Forward compactions involving last level to the bottom pool if it exists,
     // such that compactions unlikely to contribute to write stalls can be
     // delayed or deprioritized.
@@ -2716,6 +2887,7 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
     env_->Schedule(&DBImpl::BGWorkBottomCompaction, ca, Env::Priority::BOTTOM,
                    this, &DBImpl::UnscheduleCompactionCallback);
   } else {
+    std::cout << "Normal Compaction" <<std::endl;
     TEST_SYNC_POINT_CALLBACK("DBImpl::BackgroundCompaction:BeforeCompaction",
                              c->column_family_data());
     int output_level __attribute__((__unused__));
@@ -2732,7 +2904,7 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
         this, env_, c->mutable_cf_options()->snap_refresh_nanos,
         immutable_db_options_.info_log.get());
     CompactionJob compaction_job(
-        job_context->job_id, compaction_id_.fetch_add(1), c.get(), immutable_db_options_,
+        job_context->job_id, c.get(), immutable_db_options_,
         env_options_for_compaction_, versions_.get(), &shutting_down_,
         preserve_deletes_seqnum_.load(), log_buffer, directories_.GetDbDir(),
         GetDataDir(c->column_family_data(), c->output_path_id()), stats_,
@@ -2744,7 +2916,7 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
         immutable_db_options_.max_subcompactions <= 1 &&
                 c->mutable_cf_options()->snap_refresh_nanos > 0
             ? &fetch_callback
-            : nullptr, rocksdb_trainer);
+            : nullptr);
     compaction_job.Prepare();
 
     NotifyOnCompactionBegin(c->column_family_data(), c.get(), status,
@@ -2756,8 +2928,42 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
     compaction_job.Run();
     TEST_SYNC_POINT("DBImpl::BackgroundCompaction:NonTrivial:AfterRun");
     mutex_.Lock();
+  
+    if (c->column_family_data()->ioptions()->compaction_pri == kRSMPolicy) {   
+      compaction_id_.fetch_add(1);
+      std::cout << "compaction = " << compaction_id_ << std::endl;
+      
+      double Reward = compaction_job.CalculateReward(); 
+      SetOutputState(c->column_family_data());
+      torch::Tensor state_tensor = torch::from_blob(rocksdb_trainer->PrevState.data(), {1, 4, 4, 256}, torch::dtype(torch::kDouble));
+      torch::Tensor new_state_tensor = torch::from_blob(rocksdb_trainer->PostState.data(), {1, 4, 4, 256}, torch::dtype(torch::kDouble));
+      
+      std::vector<double> tempAction;
+      if( rocksdb_trainer->Action.size() == 0 ) {
+        for(int i = 0; i < 16; i ++) tempAction.push_back(0); // we does not consider level = 0;
+      } else {
+        tempAction = rocksdb_trainer->Action;
+      }
+      
+      torch::Tensor action_tensor = torch::tensor(tempAction, torch::dtype(torch::kDouble));
+      torch::Tensor reward_tensor = torch::tensor(Reward, torch::dtype(torch::kDouble));
 
-    status = compaction_job.Install(*c->mutable_cf_options(), all_rewards);
+      rocksdb_trainer->buffer.push(state_tensor, new_state_tensor, action_tensor.unsqueeze(0), reward_tensor);
+
+      if (rocksdb_trainer->buffer.size_buffer() >= 8) {
+        rocksdb_trainer->learn();
+      }
+
+      if (compaction_id_ % 5 == 0) {
+        std::cout<<"[DDPG policy REWARD] : " << Reward << std::endl;
+      }
+    
+      if(compaction_id_ % 1000 == 0) {
+        rocksdb_trainer->saveCheckPoints();    
+      }
+    }
+    
+    status = compaction_job.Install(*c->mutable_cf_options());
     if (status.ok()) {
       InstallSuperVersionAndScheduleWork(c->column_family_data(),
                                          &job_context->superversion_contexts[0],

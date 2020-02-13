@@ -937,6 +937,16 @@ Compaction* ColumnFamilyData::PickCompaction(
   return result;
 }
 
+Compaction* ColumnFamilyData::PickCompaction(
+    const MutableCFOptions& mutable_options, LogBuffer* log_buffer, Trainer* trainer) {
+  auto* result = compaction_picker_->PickCompactionRL(
+      GetName(), mutable_options, current_->storage_info(), log_buffer, trainer);
+  if (result != nullptr) {
+    result->SetInputVersion(current_);
+  }
+  return result;
+}
+
 bool ColumnFamilyData::RangeOverlapWithCompaction(
     const Slice& smallest_user_key, const Slice& largest_user_key,
     int level) const {

@@ -1499,6 +1499,8 @@ class DBImpl : public DB {
                                 Env::Priority thread_pri);
   void BackgroundCallFlush(Env::Priority thread_pri);
   void BackgroundCallPurge();
+  void SetInputState(ColumnFamilyData* cfd);
+  void SetOutputState(ColumnFamilyData* cfd);
   Status BackgroundCompaction(bool* madeProgress, JobContext* job_context,
                               LogBuffer* log_buffer,
                               PrepickedCompaction* prepicked_compaction,
@@ -1960,8 +1962,7 @@ class DBImpl : public DB {
 
   bool wal_in_db_path_;
   Trainer* rocksdb_trainer;
-  std::vector<float> all_rewards;
-  //std::vector<torch::Tensor> losses;
+  int channel_size = 4;
 };
 
 extern Options SanitizeOptions(const std::string& db, const Options& src);
