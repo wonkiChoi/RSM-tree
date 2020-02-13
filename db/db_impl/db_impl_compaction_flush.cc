@@ -2442,7 +2442,7 @@ double KernelCdf(double *samples, double obs, size_t n) {
 }
 
 void DBImpl::SetInputState(ColumnFamilyData* cfd) {
-        std::cout << "SetInputState" <<std::endl;
+  std::cout << "SetInputState" <<std::endl;
   auto ostorage = cfd->GetSuperVersion()->current->storage_info();
   rocksdb_trainer->PrevState.clear();  
   std::vector<std::vector<std::vector<double>>> indice;
@@ -2503,7 +2503,7 @@ void DBImpl::SetInputState(ColumnFamilyData* cfd) {
 }
 
 void DBImpl::SetOutputState(ColumnFamilyData* cfd) {
-    std::cout << "SetOutputState" <<std::endl;
+  std::cout << "SetOutputState" <<std::endl;
   auto vstorage = cfd->current()->storage_info();
   rocksdb_trainer->PostState.clear();
   std::vector<std::vector<std::vector<double>>> new_indice;
@@ -2836,6 +2836,41 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
     status = versions_->LogAndApply(c->column_family_data(),
                                     *c->mutable_cf_options(), c->edit(),
                                     &mutex_, directories_.GetDbDir());
+    
+    if (c->column_family_data()->ioptions()->compaction_pri == kRSMPolicy) {   
+      compaction_id_.fetch_add(1);
+      std::cout << "compaction = " << compaction_id_ << std::endl;
+      
+      double Reward = -1;
+      SetOutputState(c->column_family_data());
+      torch::Tensor state_tensor = torch::from_blob(rocksdb_trainer->PrevState.data(), {1, 4, 4, 256}, torch::dtype(torch::kDouble));
+      torch::Tensor new_state_tensor = torch::from_blob(rocksdb_trainer->PostState.data(), {1, 4, 4, 256}, torch::dtype(torch::kDouble));
+      
+      std::vector<double> tempAction;
+      if( rocksdb_trainer->Action.size() == 0 ) {
+        for(int i = 0; i < 16; i ++) tempAction.push_back(0); // we does not consider level = 0;
+      } else {
+        tempAction = rocksdb_trainer->Action;
+      }
+      
+      torch::Tensor action_tensor = torch::tensor(tempAction, torch::dtype(torch::kDouble));
+      torch::Tensor reward_tensor = torch::tensor(Reward, torch::dtype(torch::kDouble));
+
+      rocksdb_trainer->buffer.push(state_tensor, new_state_tensor, action_tensor.unsqueeze(0), reward_tensor);
+
+      if (rocksdb_trainer->buffer.size_buffer() >= 8) {
+        rocksdb_trainer->learn();
+      }
+
+      if (compaction_id_ % 5 == 0) {
+        std::cout<<"[DDPG policy REWARD] : " << Reward << std::endl;
+      }
+    
+      if(compaction_id_ % 1000 == 0) {
+        rocksdb_trainer->saveCheckPoints();    
+      }
+    }
+    
     // Use latest MutableCFOptions
     InstallSuperVersionAndScheduleWork(c->column_family_data(),
                                        &job_context->superversion_contexts[0],
@@ -2928,7 +2963,9 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
     compaction_job.Run();
     TEST_SYNC_POINT("DBImpl::BackgroundCompaction:NonTrivial:AfterRun");
     mutex_.Lock();
-  
+     
+    status = compaction_job.Install(*c->mutable_cf_options());
+    
     if (c->column_family_data()->ioptions()->compaction_pri == kRSMPolicy) {   
       compaction_id_.fetch_add(1);
       std::cout << "compaction = " << compaction_id_ << std::endl;
@@ -2963,7 +3000,6 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
       }
     }
     
-    status = compaction_job.Install(*c->mutable_cf_options());
     if (status.ok()) {
       InstallSuperVersionAndScheduleWork(c->column_family_data(),
                                          &job_context->superversion_contexts[0],
