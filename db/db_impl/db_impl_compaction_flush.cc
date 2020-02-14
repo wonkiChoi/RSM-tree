@@ -2417,8 +2417,8 @@ double GaussKernel(double x) {
 }
 
 double GaussCdf(double x) { 
+  //std::cout << "cdf : " << x << " and " << x/M_SQRT2 << " and " << erf(x/M_SQRT2) << std::endl;
   double cdf = (1 + gsl_sf_erf(x/M_SQRT2))/2; 
-  //std::cout << "cdf : " << x << " and " << cdf << std::endl;
   return cdf;
 }
 
@@ -2440,14 +2440,13 @@ double KernelCdf(double *samples, double obs, size_t n) {
   double prob = 0;
   for(i = 0; i < n; i++)
   {
-    //std::cout << "samples = "  << samples[i] << std::endl;
-    prob += GaussCdf((obs - samples[i])/h)/(n*h);
+//    prob += GaussCdf((obs - samples[i])/h)/(n*h);
+      prob += GaussCdf((obs - samples[i]))/(n);
   }
   return prob;
 }
 
 void DBImpl::SetInputState(ColumnFamilyData* cfd) {
-  std::cout << "SetInputState" <<std::endl;
   auto ostorage = cfd->GetSuperVersion()->current->storage_info();
   rocksdb_trainer->PrevState.clear();  
   std::vector<std::vector<std::vector<double>>> indice;
@@ -2493,6 +2492,7 @@ void DBImpl::SetInputState(ColumnFamilyData* cfd) {
         //for(uint l = 0; l < data_vec.size(); l++) std::cout << "data_vect = " << data_vec.at(l) << std::endl;
         if (data_vec.size() == 0) {
           prob = 0;
+          sum_prob += prob;
         } else if (k == 1) {
           prob = KernelCdf(data_vec.data(), 256*k, data_vec.size());
           sum_prob += prob;
@@ -2503,14 +2503,12 @@ void DBImpl::SetInputState(ColumnFamilyData* cfd) {
         }
         rocksdb_trainer->PrevState.push_back(prob);
       }
-      //std::cout << "prob : " << sum_prob <<std::endl;
+      //std::cout << "channel : " << i << " level : " << j << " prob : " << (int)sum_prob <<std::endl;
     }
   }
-  std::cout << "SetInputState end : " << rocksdb_trainer->PrevState.size() <<std::endl;  
 }
 
 void DBImpl::SetOutputState(ColumnFamilyData* cfd) {
-  std::cout << "SetOutputState" <<std::endl;
   auto vstorage = cfd->current()->storage_info();
   rocksdb_trainer->PostState.clear();
   std::vector<std::vector<std::vector<double>>> new_indice;
@@ -2564,7 +2562,6 @@ void DBImpl::SetOutputState(ColumnFamilyData* cfd) {
       }
     }
   }
-    std::cout << "SetOutputState end : " << rocksdb_trainer->PostState.size() <<std::endl;
 }
 
 Status DBImpl::BackgroundCompaction(bool* made_progress,
@@ -2770,7 +2767,6 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
     // Nothing to do
     ROCKS_LOG_BUFFER(log_buffer, "Compaction nothing to do");
   } else if (c->deletion_compaction()) {
-    std::cout << "Deletion Compaction" <<std::endl;
     // TODO(icanadi) Do we want to honor snapshots here? i.e. not delete old
     // file if there is alive snapshot pointing to it
     TEST_SYNC_POINT_CALLBACK("DBImpl::BackgroundCompaction:BeforeCompaction",
@@ -2801,7 +2797,6 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
     TEST_SYNC_POINT_CALLBACK("DBImpl::BackgroundCompaction:AfterCompaction",
                              c->column_family_data());
   } else if (!trivial_move_disallowed && c->IsTrivialMove()) {
-    std::cout << "Trivial Mode" <<std::endl;
     TEST_SYNC_POINT("DBImpl::BackgroundCompaction:TrivialMove");
     TEST_SYNC_POINT_CALLBACK("DBImpl::BackgroundCompaction:BeforeCompaction",
                              c->column_family_data());
@@ -2858,7 +2853,7 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
       
       std::vector<double> tempAction;
       if( rocksdb_trainer->Action.size() == 0 ) {
-        for(int i = 0; i < 16; i ++) tempAction.push_back(0); // we does not consider level = 0;
+        for(int i = 0; i < 12; i++) tempAction.push_back(0); // we does not consider level = 0;
       } else {
         tempAction = rocksdb_trainer->Action;
       }
@@ -2932,7 +2927,6 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
     env_->Schedule(&DBImpl::BGWorkBottomCompaction, ca, Env::Priority::BOTTOM,
                    this, &DBImpl::UnscheduleCompactionCallback);
   } else {
-    std::cout << "Normal Compaction" <<std::endl;
     TEST_SYNC_POINT_CALLBACK("DBImpl::BackgroundCompaction:BeforeCompaction",
                              c->column_family_data());
     int output_level __attribute__((__unused__));
@@ -2988,7 +2982,7 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
       
       std::vector<double> tempAction;
       if( rocksdb_trainer->Action.size() == 0 ) {
-        for(int i = 0; i < 16; i ++) tempAction.push_back(0); // we does not consider level = 0;
+        for(int i = 0; i < 12; i ++) tempAction.push_back(0); // we does not consider level = 0;
       } else {
         tempAction = rocksdb_trainer->Action;
       }

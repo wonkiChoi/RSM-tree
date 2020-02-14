@@ -500,7 +500,6 @@ bool LevelCompactionBuilder::PickFileToCompact() {
   }
 
   start_level_inputs_.clear();
-
   assert(start_level_ >= 0);
 
   // Pick the largest file in this level that is not already
@@ -554,9 +553,10 @@ bool LevelCompactionBuilder::PickFileToCompact() {
     for (size_t i = 0; i < temp.size(); i++) {
       files_.push_back(static_cast<int>(temp[i].index));
     }
+    assert(temp.size() == files_.size());
     vstorage_->SetNextCompactionIndex(start_level_, 0);
   }
-                       
+    
   const std::vector<int>& file_size =
       vstorage_->FilesByCompactionPri(start_level_);
   const std::vector<FileMetaData*>& level_files =
@@ -607,7 +607,6 @@ bool LevelCompactionBuilder::PickFileToCompact() {
     base_index_ = index;
     break;
   }
-
   // store where to start the iteration in the next call to PickCompaction
   vstorage_->SetNextCompactionIndex(start_level_, cmp_idx);
 

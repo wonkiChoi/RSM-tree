@@ -15,6 +15,7 @@ Actor::Actor(int64_t channelSize, int64_t action_size) : torch::nn::Module() {
 }
 
 torch::Tensor Actor::forward(torch::Tensor input) {
+        std::cout << "actor forward " <<std::endl;
   input = torch::relu(conv1(input));
   input = torch::relu(conv2(input));
 
@@ -22,6 +23,7 @@ torch::Tensor Actor::forward(torch::Tensor input) {
   input = torch::relu(linear1(input));
   input = output(input);
   input = torch::sigmoid(input);
+      std::cout << "actor forward  end" <<std::endl;
 
   return input;
 }
@@ -37,6 +39,7 @@ Critic::Critic(int64_t channelSize, int64_t action_size) : torch::nn::Module() {
 }
 
 torch::Tensor Critic::forward(torch::Tensor input, torch::Tensor action) {
+ 
   input = torch::relu(conv1(input));
   input = torch::relu(conv2(input));
 
@@ -78,6 +81,7 @@ DDPGTrainer::DDPGTrainer(int64_t channelSize, int64_t actionSize, int64_t capaci
 }  
 
 std::vector<double> DDPGTrainer::act(std::vector<double> state) {
+
   torch::Tensor torchState = torch::from_blob(state.data(), {1,4,4,256}, torch::dtype(torch::kDouble));
   actor_local->eval();
 
@@ -90,13 +94,15 @@ std::vector<double> DDPGTrainer::act(std::vector<double> state) {
 
   noise->sample(v);
   
-  for (size_t i =0; i < v.size(); i++) {
+  for (size_t i = 0; i < v.size(); i++) {
     v[i] = std::fmin(std::fmax(v[i],0.f), 1.f); // 0 =< v[i] =< 1
   }
+
   return v;
 }
 
 void DDPGTrainer::learn() {
+
   std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>> batch =
     buffer.sample_queue(batch_size);
 

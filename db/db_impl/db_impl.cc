@@ -259,7 +259,7 @@ DBImpl::DBImpl(const DBOptions& options, const std::string& dbname,
   // we won't drop any deletion markers until SetPreserveDeletesSequenceNumber()
   // is called by client and this seqnum is advanced.
   preserve_deletes_seqnum_.store(0);
-  rocksdb_trainer = new DDPGTrainer(4,16,32);
+  rocksdb_trainer = new DDPGTrainer(4,12,32);
 }
 
 Status DBImpl::Resume() {
