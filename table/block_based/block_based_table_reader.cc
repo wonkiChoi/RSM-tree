@@ -3765,15 +3765,31 @@ Status BlockBasedTable::GetIndice(std::vector<std::vector<std::vector<double>>>&
       
       if (i % 1000 == 0) {
         std::string* hexKey_1 = new std::string(iiter->user_key().ToString(1).substr(0,4));
-        std::string* hexKey_2 = new std::string(iiter->user_key().ToString(1).substr(4,8));
-        std::string* hexKey_3 = new std::string(iiter->user_key().ToString(1).substr(8,12));
-        std::string* hexKey_4 = new std::string(iiter->user_key().ToString(1).substr(12,16));
+        std::string* hexKey_2 = new std::string(iiter->user_key().ToString(1).substr(4,4));
+        std::string* hexKey_3 = new std::string(iiter->user_key().ToString(1).substr(8,4));
+        std::string* hexKey_4 = new std::string(iiter->user_key().ToString(1).substr(12,4));
+        
+//        double a = HexToDouble(*hexKey_1);
+//        double b = HexToDouble(*hexKey_2);
+//        double c = HexToDouble(*hexKey_3);
+//        double d = HexToDouble(*hexKey_4);
+        
+//        std::cout << "full string = " << iiter->user_key().ToString(1) << std::endl;
+//        std::cout << " Hex key = " << *hexKey_1 << " and " <<
+//                *hexKey_2 << " and " <<
+//                *hexKey_3 << " and " <<
+//                *hexKey_4 << std::endl;
+//        std::cout << " double key = " << a << " and " <<
+//                b << " and " <<
+//                c << " and " <<
+//                d << std::endl;
+                
         
         indice.at(0).at(level).push_back(HexToDouble(*hexKey_1));
         indice.at(1).at(level).push_back(HexToDouble(*hexKey_2));
         indice.at(2).at(level).push_back(HexToDouble(*hexKey_3));
         indice.at(3).at(level).push_back(HexToDouble(*hexKey_4));
-        
+       
         delete(hexKey_1);
         delete(hexKey_2);
         delete(hexKey_3);
