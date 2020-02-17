@@ -17,7 +17,6 @@ ExperienceReplay::ExperienceReplay(int64_t size) {
 void ExperienceReplay::push(torch::Tensor state,torch::Tensor new_state,
         torch::Tensor action, torch::Tensor reward) {
   std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor> sample (state, new_state, action, reward);
-  std::cout << "push start " <<std::endl;
   if (buffer.size() < capacity) {
     buffer.push_back(sample);
   } else {
@@ -26,7 +25,6 @@ void ExperienceReplay::push(torch::Tensor state,torch::Tensor new_state,
     }
     buffer.push_back(sample);
   }
-  std::cout << "push end " <<std::endl;
 }
 
 std::vector<std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>> ExperienceReplay::sample_queue(

@@ -15,7 +15,6 @@ Actor::Actor(int64_t channelSize, int64_t action_size) : torch::nn::Module() {
 }
 
 torch::Tensor Actor::forward(torch::Tensor input) {
-        std::cout << "actor forward " <<std::endl;
   input = torch::relu(conv1(input));
   input = torch::relu(conv2(input));
 
@@ -23,7 +22,6 @@ torch::Tensor Actor::forward(torch::Tensor input) {
   input = torch::relu(linear1(input));
   input = output(input);
   input = torch::sigmoid(input);
-      std::cout << "actor forward  end" <<std::endl;
 
   return input;
 }
@@ -81,7 +79,6 @@ DDPGTrainer::DDPGTrainer(int64_t channelSize, int64_t actionSize, int64_t capaci
 }  
 
 std::vector<double> DDPGTrainer::act(std::vector<double> state) {
-
   torch::Tensor torchState = torch::from_blob(state.data(), {1,4,4,256}, torch::dtype(torch::kDouble));
   actor_local->eval();
 

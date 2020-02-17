@@ -2863,7 +2863,7 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
 
       rocksdb_trainer->buffer.push(state_tensor, new_state_tensor, action_tensor.unsqueeze(0), reward_tensor);
 
-      if (rocksdb_trainer->buffer.size_buffer() >= 8) {
+      if (rocksdb_trainer->buffer.size_buffer() >= 32) {
         rocksdb_trainer->learn();
       }
 
@@ -2976,7 +2976,7 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
       
       double Reward = compaction_job.CalculateReward(); 
       SetOutputState(c->column_family_data());
-      
+
       torch::Tensor state_tensor = torch::from_blob(rocksdb_trainer->PrevState.data(), {1, 4, 4, 256}, torch::dtype(torch::kDouble));
       torch::Tensor new_state_tensor = torch::from_blob(rocksdb_trainer->PostState.data(), {1, 4, 4, 256}, torch::dtype(torch::kDouble));
       
@@ -2992,7 +2992,7 @@ Status DBImpl::BackgroundCompaction(bool* made_progress,
 
       rocksdb_trainer->buffer.push(state_tensor, new_state_tensor, action_tensor.unsqueeze(0), reward_tensor);
 
-      if (rocksdb_trainer->buffer.size_buffer() >= 8) {
+      if (rocksdb_trainer->buffer.size_buffer() >= 32) {
         rocksdb_trainer->learn();
       }
 

@@ -136,8 +136,9 @@ class LevelCompactionBuilder {
   static const int kMinFilesForIntraL0Compaction = 4;
   Trainer* trainer_;
   
-  struct Fsize {
+  struct SortBase {
     size_t index;
+    double base;
     FileMetaData* file;
   };
 };
@@ -508,46 +509,41 @@ bool LevelCompactionBuilder::PickFileToCompact() {
     std::vector<int>& files_ = vstorage_->FilesByCompactionPriNonConst(start_level_);
     files_.clear();
     const std::vector<FileMetaData*>& level_files = vstorage_->LevelFiles(start_level_);
-    std::vector<Fsize> temp(level_files.size());
+
+    trainer_->Action = trainer_->act(trainer_->PrevState);
+    std::vector<double> act = trainer_->Action; 
+                   
+    std::vector<SortBase> temp(level_files.size());
     for (size_t i = 0; i < level_files.size(); i++) {
       temp[i].index = i;
       temp[i].file = level_files[i];
+      double val = 0.0;
+      for(unsigned int j = 0; j < 4; j++) {
+        double comp = act.at((start_level_-1)*4 + j) * 65536;
+        std::string* small_f1 = new std::string(temp[i].file->smallest.user_key().ToString(1).substr(4*j,4));
+        std::string* large_f1 = new std::string(temp[i].file->largest.user_key().ToString(1).substr(4*j,4));
+        
+        double s1 = HexToDouble(*small_f1);
+        double l1 = HexToDouble(*large_f1);
+                    
+        val += pow(s1 - comp, 2) + pow(l1 - comp, 2); 
+
+        delete(small_f1);
+        delete(large_f1);   
+      }      
+      temp[i].base = val;
     }
-    trainer_->Action = trainer_->act(trainer_->PrevState);
-    std::vector<double> act = trainer_->Action;
+       
+   
+//    std::sort(temp.begin(), temp.end(),
+//        [](const SortBase& f1, SortBase& f2) -> bool {
+//          return f1.file->fd.largest_seqno <
+//          f2.file->fd.largest_seqno;
+//        });
     
     std::sort(temp.begin(), temp.end(),
-            [=](const Fsize& f1, const Fsize& f2) -> bool {
-                double val_f1 = 0.0;
-                for(int i = 0; i < 4 /*channel_size*/; i++) {
-                  double comp = act.at((start_level_-1)*4 + i) * 65536;
-                  std::string* small_f1 = new std::string(f1.file->smallest.user_key().ToString(1).substr(4*i,4));
-                  std::string* large_f1 = new std::string(f1.file->largest.user_key().ToString(1).substr(4*i,4));
-                    
-                  double s1 = HexToDouble(*small_f1);
-                  double l1 = HexToDouble(*large_f1);
-                    
-                  delete(small_f1);
-                  delete(large_f1);
-                    
-                  val_f1 += pow(s1 - comp, 2) + pow(l1 - comp, 2);  
-                }
-                    
-                double val_f2 = 0.0;
-                for(int i = 0; i < 4; i++) {
-                  double comp = act.at((start_level_-1)*4 + i) * 65536;
-                  std::string* small_f2 = new std::string(f2.file->smallest.user_key().ToString(1).substr(4*i,4));
-                  std::string* large_f2 = new std::string(f2.file->largest.user_key().ToString(1).substr(4*i,4));
-
-                  double s2 = HexToDouble(*small_f2);
-                  double l2 = HexToDouble(*large_f2);
-                      
-                  delete(small_f2);
-                  delete(large_f2);
-                    
-                  val_f2 += pow(s2 - comp, 2) + pow(l2 - comp, 2);
-                }    
-                  return val_f1 < val_f2;
+            [=](const SortBase& f1, const SortBase& f2) -> bool {
+                return f1.base < f2.base;  
                 });
    
     for (size_t i = 0; i < temp.size(); i++) {
@@ -609,7 +605,6 @@ bool LevelCompactionBuilder::PickFileToCompact() {
   }
   // store where to start the iteration in the next call to PickCompaction
   vstorage_->SetNextCompactionIndex(start_level_, cmp_idx);
-
   return start_level_inputs_.size() > 0;
 }
 
